@@ -1,0 +1,1576 @@
+<html><head><meta content="light dark" name="color-scheme"/><link href="../style/icons/default/16x16.png" rel="icon"/><link href="../style/themes/github-dark.css" id="_theme" rel="stylesheet" type="text/css"/><link href="../style/vendor/prism-okaidia.min.css" id="_prism" rel="stylesheet" type="text/css"/><link defer="" href="../style/style.css" rel="stylesheet"/><style>
+.pre-container {
+    position: relative;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    background-color: #800000; /* Maroon */
+    color: white;
+    border: 1px solid #5c0000; /* Darker maroon */
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.copy-btn:hover {
+    background-color: #a00000; /* Lighter maroon on hover */
+}
+
+.copy-btn.copied {
+    background-color: #006400; /* Dark Green */
+    border-color: #004d00;
+    color: white;
+}
+
+.copy-btn.failed {
+    background-color: #dc3545; /* Red */
+    border-color: #c82333;
+    color: white;
+}
+</style></head><body class="_theme-github _color-light"><div class="markdown-body" id="_html" style="visibility: visible;"><div class="akbar_container"><h1 id="chapter-5-testing-your-models" tabindex="-1"><a class="anchor" href="#chapter-5-testing-your-models" name="chapter-5-testing-your-models" tabindex="-1"><span class="octicon octicon-link"></span></a>Chapter 5: Testing Your Models</h1>
+<h2 id="51-setting-up-pytestmarkdjango_db-explained" tabindex="-1"><a class="anchor" href="#51-setting-up-pytestmarkdjango_db-explained" name="51-setting-up-pytestmarkdjango_db-explained" tabindex="-1"><span class="octicon octicon-link"></span></a>5.1 Setting Up: <code>@pytest.mark.django_db</code> Explained</h2>
+<p>In Chapter 4, we delved into the critical concept of the test database – a pristine, isolated environment automatically managed by <code>pytest-django</code>. This separation from your development database is paramount for reliable, reproducible tests. Now, we need to understand how we instruct <code>pytest</code> and <code>pytest-django</code> that a particular test function requires access to this special test database. This is where the <code>@pytest.mark.django_db</code> marker comes into play.</p>
+<p><strong>The Problem: Bridging Your Test to the Test Database</strong></p>
+<p>Imagine writing a test for a Django model. You'll want to create model instances, save them, query them, and assert their properties. All these operations interact with the database. If your test function simply tries to access <code>YourModel.objects.create(...)</code> without any special setup, Django wouldn't know which database to use, or worse, it might try to use your development database (which we've established is dangerous for testing). Even more likely, <code>pytest-django</code> itself will proactively prevent this, raising an error because database access is disallowed by default to protect you from accidental misconfiguration.</p>
+<p>Your test functions need an explicit signal to <code>pytest-django</code> saying, "I intend to interact with the database; please prepare it for me and grant access."</p>
+<p><strong>Introducing <code>@pytest.mark.django_db</code></strong></p>
+<p>The <code>@pytest.mark.django_db</code> is a <strong>marker</strong> provided by the <code>pytest-django</code> plugin. In Pytest, markers are a way to add metadata to your test functions. This particular marker serves as a crucial instruction: it tells <code>pytest-django</code> that the decorated test function needs access to the Django database.</p>
+<p>Think of it as a permission slip. Without this "slip," your test is denied entry to the database. With it, <code>pytest-django</code> rolls out the red carpet, ensuring the test database is ready and accessible.</p>
+<p><strong>How Does It Work? The Magic Unveiled</strong></p>
+<p>When <code>pytest-django</code> encounters a test function decorated with <code>@pytest.mark.django_db</code>, it performs several key actions, building upon the test database lifecycle we discussed in Chapter 4:</p>
+<ol>
+<li><strong>Database Availability Check:</strong> It ensures that the test database has been created for the current test session. If it's the first test requiring database access, <code>pytest-django</code> will trigger the creation of the test database (e.g., <code>test_yourproject</code>).</li>
+<li><strong>Schema Migrations:</strong> It verifies that all Django migrations have been applied to the test database, ensuring the schema is up-to-date and matches your models.</li>
+<li><strong>Transaction Management (Default Behavior):</strong> This is a cornerstone of test isolation and efficiency. By default, <code>@pytest.mark.django_db</code> wraps your test function execution within a database transaction.
+<ul>
+<li><strong>Before the test runs:</strong> A new transaction is started.</li>
+<li><strong>During the test:</strong> All database operations (creates, updates, deletes) occur within this transaction.</li>
+<li><strong>After the test finishes (pass or fail):</strong> The transaction is <strong>rolled back</strong>. This means any changes made to the database during the test are undone.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Why is This Transactional Behavior So Important?</strong></p>
+<ul>
+<li><strong>Test Isolation:</strong> Because each test's database changes are rolled back, tests do not interfere with each other. Test A can create data, and Test B will not see that data unless it creates it anew. This is fundamental for reliable tests. If Test A left data behind, Test B's assertions might pass or fail based on Test A's leftovers, leading to flaky and unpredictable results.</li>
+<li><strong>Speed:</strong> Creating an entire database and running migrations for <em>every single test function</em> would be incredibly slow. By using transactions, <code>pytest-django</code> sets up the database schema once (per session, typically) and then uses fast transaction rollbacks to reset the <em>data state</em> for each test. This provides a clean slate for each test without the significant overhead of full database recreation.</li>
+</ul>
+<p><strong>Practical Example: Seeing <code>@pytest.mark.django_db</code> in Action</strong></p>
+<p>Let's illustrate with a simple Django model and a test.</p>
+<p>First, imagine we have a basic model in <code>yourapp/models.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/models.py</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+
+<span class="token keyword">class</span> <span class="token class-name">Article</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    content <span class="token operator">=</span> models<span class="token punctuation">.</span>TextField<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+</code></pre>
+<p>Now, let's write some tests in <code>yourapp/tests/test_models.py</code>.</p>
+<p><strong>Scenario 1: Attempting Database Access Without the Marker</strong></p>
+<p>If you try to write a test that interacts with the <code>Article</code> model without the marker, <code>pytest-django</code> will prevent it.</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/tests/test_models.py</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> yourapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Article <span class="token comment"># Make sure to import your model</span>
+
+<span class="token keyword">def</span> <span class="token function">test_article_creation_fails_without_marker</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># This test demonstrates what happens if you forget @pytest.mark.django_db</span>
+    <span class="token comment"># We expect an error when trying to access the database.</span>
+    <span class="token keyword">with</span> pytest<span class="token punctuation">.</span>raises<span class="token punctuation">(</span>RuntimeError<span class="token punctuation">,</span> <span class="token keyword">match</span><span class="token operator">=</span><span class="token string">"Database access not allowed"</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+        Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"My First Article"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Some content."</span><span class="token punctuation">)</span>
+        <span class="token comment"># The above line will raise an error before an assertion can be reached.</span>
+        <span class="token comment"># If it didn't, an assertion like this would be next:</span>
+        <span class="token comment"># assert Article.objects.count() == 1</span>
+</code></pre>
+<p>Let's examine this code in detail:</p>
+<ol>
+<li><code>import pytest</code> and <code>from yourapp.models import Article</code>: Standard imports for Pytest and our Django model.</li>
+<li><code>def test_article_creation_fails_without_marker():</code>: A standard Pytest test function.</li>
+<li><code>with pytest.raises(RuntimeError, match="Database access not allowed"):</code>: This is Pytest's way of asserting that a specific exception is raised. We are explicitly expecting a <code>RuntimeError</code>. The <code>match</code> argument further specifies that the error message should contain the phrase "Database access not allowed".
+<ul>
+<li>This accomplishes the goal of demonstrating the protective behavior of <code>pytest-django</code>. When database access is not explicitly enabled for a test, <code>pytest-django</code> raises this <code>RuntimeError</code> to prevent unintended database operations.</li>
+</ul>
+</li>
+<li><code>Article.objects.create(title="My First Article", content="Some content.")</code>: This is the line that attempts to interact with the database by creating a new <code>Article</code> instance.
+<ul>
+<li>Because the <code>@pytest.mark.django_db</code> marker is missing, this operation is disallowed, and <code>pytest-django</code> will raise the <code>RuntimeError</code> <em>before</em> this line can successfully complete or any subsequent assertions are checked.</li>
+</ul>
+</li>
+</ol>
+<p>If you were to run this test (without the <code>pytest.raises</code> context manager for demonstration), <code>pytest</code> would report a failure, and the traceback would point to the <code>Article.objects.create(...)</code> line, indicating the <code>RuntimeError: Database access not allowed...</code> (you might also see messages like "use the <code>django_db</code> mark, or the <code>db</code> or <code>transactional_db</code> fixtures to enable it."). This error is <code>pytest-django</code> telling you, "Hold on! You need to explicitly state that this test requires database access."</p>
+<p><strong>Scenario 2: Successfully Accessing the Database With the Marker</strong></p>
+<p>Now, let's add the <code>@pytest.mark.django_db</code> marker:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/tests/test_models.py (continued)</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> yourapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Article <span class="token comment"># Assuming this is already imported</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_article_creation_succeeds_with_marker</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: No specific arrangement needed beyond the marker ensuring DB is ready.</span>
+    <span class="token comment"># Act: Create an Article instance.</span>
+    article <span class="token operator">=</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"My Test Article"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Hello, world!"</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Verify the article was created and saved.</span>
+    <span class="token keyword">assert</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1</span>
+    <span class="token keyword">assert</span> article<span class="token punctuation">.</span>title <span class="token operator">==</span> <span class="token string">"My Test Article"</span>
+    retrieved_article <span class="token operator">=</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>get<span class="token punctuation">(</span>pk<span class="token operator">=</span>article<span class="token punctuation">.</span>pk<span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> retrieved_article<span class="token punctuation">.</span>content <span class="token operator">==</span> <span class="token string">"Hello, world!"</span>
+</code></pre>
+<p>Let's break down this corrected and functional test:</p>
+<ol>
+<li><code>@pytest.mark.django_db</code>: This is the crucial addition.
+<ul>
+<li>This decorator signals to <code>pytest-django</code> that <code>test_article_creation_succeeds_with_marker</code> requires database access.</li>
+<li>Before this test function runs, <code>pytest-django</code> ensures the test database is set up (schema migrated) and starts a database transaction.</li>
+</ul>
+</li>
+<li><code>def test_article_creation_succeeds_with_marker():</code>: Our test function.
+<ul>
+<li>Note: You might sometimes see <code>db</code> explicitly passed as an argument (e.g., <code>def test_my_test(db):</code>). The <code>db</code> fixture is implicitly activated by <code>@pytest.mark.django_db</code> and provides access to the test database. While you don't always need to list <code>db</code> as a parameter for the marker to work, it can be good for clarity or if other fixtures depend on it. For basic usage like this, the marker alone is sufficient to enable database operations.</li>
+</ul>
+</li>
+<li><code>article = Article.objects.create(title="My Test Article", content="Hello, world!")</code>: This line now executes successfully.
+<ul>
+<li>An <code>Article</code> object is created and persisted to the test database within the current transaction.</li>
+</ul>
+</li>
+<li><code>assert Article.objects.count() == 1</code>: We assert that there is now one article in the database.</li>
+<li><code>assert article.title == "My Test Article"</code>: We verify the <code>title</code> attribute of the created object.</li>
+<li><code>retrieved_article = Article.objects.get(pk=article.pk)</code>: We fetch the article from the database again to ensure it was truly persisted and can be retrieved.</li>
+<li><code>assert retrieved_article.content == "Hello, world!"</code>: We verify the content of the retrieved article.
+<ul>
+<li>After this test function completes, <code>pytest-django</code> will roll back the transaction. Any articles created (like "My Test Article") will be removed from the database, ensuring the next test starts with a clean data slate.</li>
+</ul>
+</li>
+</ol>
+<p>This pattern demonstrates how <code>@pytest.mark.django_db</code> enables controlled and isolated database interactions, which is fundamental for writing reliable model tests (and any other tests that touch the database).</p>
+<p><strong>Placement of the Marker</strong></p>
+<p>You can apply the <code>@pytest.mark.django_db</code> marker in several ways:</p>
+<ul>
+<li><strong>On individual test functions:</strong> As shown above, for fine-grained control.<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token keyword">import</span> pytest
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_something_with_db</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># ... db operations ...</span>
+    <span class="token keyword">pass</span>
+
+<span class="token keyword">def</span> <span class="token function">test_something_without_db</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># ... no db operations ...</span>
+    <span class="token keyword">pass</span>
+</code></pre>
+</li>
+<li><strong>On a test class:</strong> If all test methods within a class require database access.<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token keyword">import</span> pytest
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">class</span> <span class="token class-name">TestArticleQueries</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">test_find_by_title</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># ... db operations ...</span>
+        <span class="token keyword">pass</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_filter_by_content</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># ... db operations ...</span>
+        <span class="token keyword">pass</span>
+</code></pre>
+In this case, <code>pytest-django</code> will set up database access and transaction handling for each method within <code>TestArticleQueries</code>.</li>
+<li><strong>At the module level:</strong> By defining <code>pytestmark = pytest.mark.django_db</code> at the top of your test file. This applies the marker to all test functions and methods within that file.<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_all_db_related.py</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> yourapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Article <span class="token comment"># Example import</span>
+
+<span class="token comment"># Apply django_db marker to all tests in this file</span>
+pytestmark <span class="token operator">=</span> pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db
+
+<span class="token keyword">def</span> <span class="token function">test_first_db_operation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"First"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&gt;</span> <span class="token number">0</span> <span class="token comment"># Simplified assertion</span>
+
+<span class="token keyword">def</span> <span class="token function">test_second_db_operation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Second"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&gt;</span> <span class="token number">0</span> <span class="token comment"># Simplified assertion</span>
+
+<span class="token keyword">class</span> <span class="token class-name">TestMoreDbOperations</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">test_class_method_db_op</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Third"</span><span class="token punctuation">)</span>
+        <span class="token keyword">assert</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&gt;</span> <span class="token number">0</span> <span class="token comment"># Simplified assertion</span>
+</code></pre>
+Let's examine this module-level application:
+<ol>
+<li><code>pytestmark = pytest.mark.django_db</code>: This special variable name, <code>pytestmark</code> (note: lowercase), when assigned a marker or a list of markers at the module level, tells Pytest to apply these markers to all test items discovered within that module.
+<ul>
+<li>This is a convenient way to avoid decorating every single function or class if an entire test file is dedicated to database-dependent tests.</li>
+<li>It ensures consistency and reduces boilerplate.</li>
+</ul>
+</li>
+<li><code>def test_first_db_operation():</code>, <code>def test_second_db_operation():</code>, and <code>TestMoreDbOperations.test_class_method_db_op(self)</code>: All these tests will now automatically have database access enabled and will be wrapped in transactions due to the module-level <code>pytestmark</code>.</li>
+</ol>
+</li>
+</ul>
+<p><strong>Understanding Transaction Control (Brief Overview)</strong></p>
+<p>The default behavior of <code>@pytest.mark.django_db</code> is <code>transaction=True</code>. This means each test runs in its own transaction, which is rolled back. This is generally what you want for unit and integration tests involving the database, as it's fast and provides excellent isolation.</p>
+<p>There are scenarios where you might want to disable this per-test transaction behavior, for example, if you are specifically testing Django's transaction management features or in some complex end-to-end testing setups (which we'll touch upon much later). You can do this with <code>@pytest.mark.django_db(transaction=True)</code> (explicitly stating the default) or <code>@pytest.mark.django_db(transaction=False)</code>.</p>
+<p>For now, and for the vast majority of your model tests, the default transactional behavior is precisely what you need. We will explore <code>transaction=False</code> and its implications in more advanced contexts if necessary, particularly when discussing <code>live_server</code> for end-to-end tests where cross-thread visibility of data can be a concern.</p>
+<p><strong>Common Pitfalls and Reminders</strong></p>
+<ol>
+<li><strong>Forgetting the Marker:</strong> The most common issue is simply forgetting to add <code>@pytest.mark.django_db</code>. This will lead to the <code>RuntimeError: Database access not allowed...</code> we saw earlier. If you see this error, the first thing to check is whether your test function or its class/module has the <code>django_db</code> marker.</li>
+<li><strong>Misunderstanding Isolation:</strong> Remember, the isolation comes from transaction rollbacks (by default). The database schema itself is generally set up once per test session. The marker ensures your <em>data modifications</em> are isolated test by test.</li>
+<li><strong>Relying on Data from Other Tests:</strong> Never write tests that depend on data created by a <em>previous</em> test. The transaction rollback mechanism is designed to prevent this. Each test should set up all the data it needs to run independently. Fixtures, which we'll cover in Chapter 8, are excellent for managing this setup.</li>
+</ol>
+<p><strong>In Summary</strong></p>
+<p>The <code>@pytest.mark.django_db</code> marker is your gateway to interacting with the Django test database. It signals <code>pytest-django</code> to:</p>
+<ul>
+<li>Ensure the test database is created and migrations are applied.</li>
+<li>Wrap your test in a database transaction (by default), providing data isolation and speed.</li>
+<li>Roll back this transaction after the test, cleaning up any data changes.</li>
+</ul>
+<p>Mastering its use is the first crucial step in writing effective tests for your Django models and any other components that interact with your database. Without it, your database-aware tests simply won't run. With it, you unlock the power of isolated, repeatable, and reliable database testing.</p>
+<h2 id="52-creating-test-data-with-the-orm" tabindex="-1"><a class="anchor" href="#52-creating-test-data-with-the-orm" name="52-creating-test-data-with-the-orm" tabindex="-1"><span class="octicon octicon-link"></span></a>5.2 Creating Test Data with the ORM</h2>
+<p>In the previous section, we introduced the <code>@pytest.mark.django_db</code> marker, which grants our tests access to a dedicated, isolated test database. This is a crucial first step. However, an empty database isn't very useful for testing most model behaviors, view logic, or form processing. To truly test our Django application's components, we need to populate this test database with specific data relevant to the scenario we're testing. This is where Django's Object-Relational Mapper (ORM) comes into play.</p>
+<p><strong>The "Why": Using the ORM for Test Data</strong></p>
+<p>You might wonder why we use the Django ORM to create test data. Why not write raw SQL queries or use other data loading mechanisms? There are several compelling reasons:</p>
+<ol>
+<li><strong>Consistency</strong>: Your application code uses the Django ORM to interact with the database. Using the same ORM in your tests ensures that you're creating and manipulating data in a way that's consistent with how your application operates. This reduces the chances of discrepancies between your test environment and your actual application behavior.</li>
+<li><strong>Abstraction and Portability</strong>: The ORM abstracts away the specifics of the underlying database system (PostgreSQL, MySQL, SQLite, etc.). If you write tests using the ORM, they remain portable even if you switch database backends. Raw SQL, on the other hand, might require modifications.</li>
+<li><strong>Ease of Use and Readability</strong>: For most common data creation tasks, the ORM provides a Pythonic, intuitive, and readable API. Creating model instances and defining their relationships is often more straightforward than writing equivalent SQL.</li>
+<li><strong>Leveraging Model Logic</strong>: If your models have custom <code>save()</code> methods, default values, or other logic that fires during object creation or modification, using the ORM ensures this logic is also executed during test data setup. This makes your test setup more representative of real-world data creation.</li>
+<li><strong>Maintainability</strong>: As your models evolve, tests that use the ORM are generally easier to update than tests relying on raw SQL or fixture files that might become desynchronized with your model definitions.</li>
+</ol>
+<p>Essentially, using the Django ORM for test data creation allows you to work at the same level of abstraction as your application code, leading to more robust, maintainable, and reliable tests.</p>
+<p><strong>Creating a Simple Model Instance</strong></p>
+<p>Let's assume we have a simple <code>Book</code> model in an app, say <code>library_app.models</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># library_app/models.py (Illustrative - not part of the test file)</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+
+<span class="token keyword">class</span> <span class="token class-name">Book</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    publication_year <span class="token operator">=</span> models<span class="token punctuation">.</span>IntegerField<span class="token punctuation">(</span>null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+
+    <span class="token keyword">def</span> <span class="token function">is_classic</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>publication_year <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">False</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>publication_year <span class="token operator">&lt;</span> <span class="token number">1970</span>
+</code></pre>
+<p>This is a straightforward Django model. The <code>is_classic</code> method is a piece of business logic we might want to test. To test it, we first need a <code>Book</code> instance in our test database.</p>
+<p>Here's how you would create a <code>Book</code> instance within a test function using the ORM:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_models.py</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> library_app<span class="token punctuation">.</span>models <span class="token keyword">import</span> Book
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_creation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Create a Book instance</span>
+    book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"The Great Gatsby"</span><span class="token punctuation">,</span> publication_year<span class="token operator">=</span><span class="token number">1925</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Act: Retrieve the book from the database (optional, for verification)</span>
+    retrieved_book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>get<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"The Great Gatsby"</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check if the book was created and attributes are correct</span>
+    <span class="token keyword">assert</span> retrieved_book <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>title <span class="token operator">==</span> <span class="token string">"The Great Gatsby"</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>publication_year <span class="token operator">==</span> <span class="token number">1925</span>
+</code></pre>
+<p>Let's examine this code in detail:</p>
+<ol>
+<li>
+<p><strong><code>import pytest</code> and <code>from library_app.models import Book</code></strong>:</p>
+<ul>
+<li>We import <code>pytest</code> to use its features, like the <code>@pytest.mark.django_db</code> marker.</li>
+<li>We import our <code>Book</code> model, which is essential for creating instances of it.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>@pytest.mark.django_db</code></strong>:</p>
+<ul>
+<li>As discussed in section 5.1, this marker is crucial. It ensures that this test function has access to the test database. Behind the scenes, <code>pytest-django</code> sets up the database, wraps the test in a transaction (by default), and tears down the database or rolls back the transaction after the test. Without it, any database operations would fail or, worse, interact with your development database.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>def test_book_creation():</code></strong>:</p>
+<ul>
+<li>This defines our test function. Pytest discovers functions prefixed with <code>test_</code> as tests.</li>
+</ul>
+</li>
+<li>
+<p><strong><code># Arrange: Create a Book instance</code></strong>:</p>
+<ul>
+<li>This comment indicates the "Arrange" phase of the AAA (Arrange-Act-Assert) pattern. Here, we set up the necessary conditions for our test.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>book = Book.objects.create(title="The Great Gatsby", publication_year=1925)</code></strong>:</p>
+<ul>
+<li>This is the core of the data creation.</li>
+<li><code>Book.objects</code> is the default manager for the <code>Book</code> model. Django automatically adds a manager named <code>objects</code> to every model class.</li>
+<li><code>.create(...)</code> is a convenient method provided by the manager that combines creating a model instance and saving it to the database in a single step. It's equivalent to:<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># Alternative, more verbose way:</span>
+<span class="token comment"># book = Book(title="The Great Gatsby", publication_year=1925)</span>
+<span class="token comment"># book.save()</span>
+</code></pre>
+</li>
+<li>We pass keyword arguments <code>title="The Great Gatsby"</code> and <code>publication_year=1925</code> to set the respective fields of the new <code>Book</code> object. These arguments correspond to the fields defined in our <code>Book</code> model.</li>
+<li>This line executes an <code>INSERT</code> SQL query against the test database. The <code>book</code> variable now holds a Python object representing the newly created row in the <code>books</code> table.</li>
+</ul>
+</li>
+<li>
+<p><strong><code># Act: Retrieve the book from the database (optional, for verification)</code></strong>:</p>
+<ul>
+<li>In this simple test, the "Act" phase is implicitly the creation itself. However, to be absolutely sure the data is in the database, we explicitly retrieve it.</li>
+<li><code>retrieved_book = Book.objects.get(title="The Great Gatsby")</code>
+<ul>
+<li><code>Book.objects.get(...)</code> is another manager method used to retrieve a <em>single</em> object from the database that matches the given lookup parameters.</li>
+<li>If no object matches, it raises a <code>Book.DoesNotExist</code> exception. If multiple objects match, it raises a <code>Book.MultipleObjectsReturned</code> exception.</li>
+<li>This line executes a <code>SELECT</code> SQL query.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code># Assert: Check if the book was created and attributes are correct</code></strong>:</p>
+<ul>
+<li>This is the "Assert" phase, where we verify the outcome.</li>
+<li><code>assert retrieved_book is not None</code>: Confirms that our <code>get()</code> call successfully found an object.</li>
+<li><code>assert retrieved_book.title == "The Great Gatsby"</code>: Checks if the <code>title</code> attribute of the retrieved object matches what we intended to save.</li>
+<li><code>assert retrieved_book.publication_year == 1925</code>: Checks the <code>publication_year</code>.</li>
+</ul>
+</li>
+</ol>
+<p>This pattern demonstrates how straightforward it is to use the Django ORM to set up data for your tests. The code is clear, directly uses your model definitions, and interacts with the database in a controlled manner thanks to <code>@pytest.mark.django_db</code>.</p>
+<p><strong>The Importance of <code>.save()</code> (When Not Using <code>.create()</code>)</strong></p>
+<p>The <code>Book.objects.create(...)</code> method is a shortcut. If you instantiate a model object directly using its constructor, it's crucial to remember that the object only exists in memory until you explicitly call its <code>save()</code> method.</p>
+<p>Consider this variation:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_models.py (illustrating .save())</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> library_app<span class="token punctuation">.</span>models <span class="token keyword">import</span> Book
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_creation_with_explicit_save</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Instantiate a Book object (in memory)</span>
+    new_book <span class="token operator">=</span> Book<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"1984"</span><span class="token punctuation">,</span> publication_year<span class="token operator">=</span><span class="token number">1949</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># At this point, new_book is NOT in the database yet.</span>
+    <span class="token comment"># Trying to retrieve it would fail:</span>
+    <span class="token comment"># with pytest.raises(Book.DoesNotExist):</span>
+    <span class="token comment">#     Book.objects.get(title="1984")</span>
+
+    <span class="token comment"># Persist the book to the database</span>
+    new_book<span class="token punctuation">.</span>save<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token comment"># This executes the INSERT SQL query</span>
+
+    <span class="token comment"># Act: Retrieve the book</span>
+    retrieved_book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>get<span class="token punctuation">(</span>pk<span class="token operator">=</span>new_book<span class="token punctuation">.</span>pk<span class="token punctuation">)</span> <span class="token comment"># Use pk for reliable retrieval</span>
+
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>title <span class="token operator">==</span> <span class="token string">"1984"</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>publication_year <span class="token operator">==</span> <span class="token number">1949</span>
+</code></pre>
+<p>Let's break down the key parts of this example:</p>
+<ol>
+<li>
+<p><strong><code>new_book = Book(title="1984", publication_year=1949)</code></strong>:</p>
+<ul>
+<li>This line creates an instance of the <code>Book</code> model in Python's memory.</li>
+<li><strong>Crucially, no database interaction occurs at this point.</strong> The <code>new_book</code> object exists only within the scope of this test function's execution memory. It does not yet have a primary key (<code>id</code> or <code>pk</code>) assigned from the database.</li>
+</ul>
+</li>
+<li>
+<p><strong>Commented-out <code>pytest.raises</code> block</strong>:</p>
+<ul>
+<li>This illustrates that if we tried to fetch the book titled "1984" from the database <em>before</em> calling <code>new_book.save()</code>, a <code>Book.DoesNotExist</code> exception would be raised, because the record hasn't been inserted into the database table.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>new_book.save()</code></strong>:</p>
+<ul>
+<li>This is the pivotal step. Calling the <code>save()</code> method on a model instance triggers the Django ORM to perform the necessary SQL <code>INSERT</code> (for new objects) or <code>UPDATE</code> (for existing objects) operation.</li>
+<li>After <code>new_book.save()</code> successfully completes, the <code>new_book</code> object is updated in place with its primary key (e.g., <code>new_book.id</code> or <code>new_book.pk</code> will be populated).</li>
+</ul>
+</li>
+<li>
+<p><strong><code>retrieved_book = Book.objects.get(pk=new_book.pk)</code></strong>:</p>
+<ul>
+<li>We retrieve the book using its primary key (<code>pk</code>). This is generally a more robust way to fetch a specific record you've just created, especially if other fields (like <code>title</code>) might not be unique.</li>
+<li>The <code>pk</code> attribute is a convenient alias for the actual primary key field name of your model (which is <code>id</code> by default if you don't specify another field as <code>primary_key=True</code>).</li>
+</ul>
+</li>
+</ol>
+<p><strong>Why this distinction matters:</strong> Forgetting to call <code>save()</code> (when not using manager methods like <code>.create()</code>) is a common pitfall for beginners. Your test might seem to have the object in a variable, but any part of your code (or Django itself) that expects the data to be in the database will not find it, leading to unexpected failures or incorrect test results. The <code>.create()</code> method is often preferred for its conciseness in test setups as it handles instantiation and saving in one go.</p>
+<p><strong>Creating Related Data</strong></p>
+<p>Real-world applications often involve models with relationships (e.g., <code>ForeignKey</code>, <code>ManyToManyField</code>, <code>OneToOneField</code>). The Django ORM makes creating related data in tests just as straightforward as in your application code.</p>
+<p>Let's expand our example with an <code>Author</code> model related to <code>Book</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># library_app/models.py (Illustrative - with Author model)</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+
+<span class="token keyword">class</span> <span class="token class-name">Author</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    name <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">100</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>name
+
+<span class="token keyword">class</span> <span class="token class-name">Book</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    author <span class="token operator">=</span> models<span class="token punctuation">.</span>ForeignKey<span class="token punctuation">(</span>Author<span class="token punctuation">,</span> on_delete<span class="token operator">=</span>models<span class="token punctuation">.</span>CASCADE<span class="token punctuation">,</span> null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    publication_year <span class="token operator">=</span> models<span class="token punctuation">.</span>IntegerField<span class="token punctuation">(</span>null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+
+    <span class="token keyword">def</span> <span class="token function">is_classic</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">if</span> self<span class="token punctuation">.</span>publication_year <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">False</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>publication_year <span class="token operator">&lt;</span> <span class="token number">1970</span>
+</code></pre>
+<p>Now, let's write a test that creates an <code>Author</code> and then a <code>Book</code> associated with that author:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_models.py (with related data)</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> library_app<span class="token punctuation">.</span>models <span class="token keyword">import</span> Author<span class="token punctuation">,</span> Book
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_with_author_creation</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Create an Author instance</span>
+    author <span class="token operator">=</span> Author<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>name<span class="token operator">=</span><span class="token string">"George Orwell"</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Arrange: Create a Book instance and associate it with the author</span>
+    book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span><span class="token string">"Animal Farm"</span><span class="token punctuation">,</span>
+        publication_year<span class="token operator">=</span><span class="token number">1945</span><span class="token punctuation">,</span>
+        author<span class="token operator">=</span>author  <span class="token comment"># Assign the Author instance here</span>
+    <span class="token punctuation">)</span>
+
+    <span class="token comment"># Act: Retrieve the book and check its author</span>
+    retrieved_book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>get<span class="token punctuation">(</span>pk<span class="token operator">=</span>book<span class="token punctuation">.</span>pk<span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>title <span class="token operator">==</span> <span class="token string">"Animal Farm"</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>author <span class="token keyword">is</span> <span class="token keyword">not</span> <span class="token boolean">None</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>author<span class="token punctuation">.</span>name <span class="token operator">==</span> <span class="token string">"George Orwell"</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>author<span class="token punctuation">.</span>pk <span class="token operator">==</span> author<span class="token punctuation">.</span>pk <span class="token comment"># Ensure it's the same author record</span>
+</code></pre>
+<p>Let's analyze the creation of related data:</p>
+<ol>
+<li>
+<p><strong><code>author = Author.objects.create(name="George Orwell")</code></strong>:</p>
+<ul>
+<li>First, we create an <code>Author</code> instance and save it to the database. The <code>author</code> variable now holds the persisted <code>Author</code> object, which includes its database-assigned primary key.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>book = Book.objects.create(...)</code></strong>:</p>
+<ul>
+<li>When creating the <code>Book</code> instance, we pass the <code>author</code> object (the Python instance we just created) to the <code>author</code> field: <code>author=author</code>.</li>
+<li><strong>Under the hood</strong>: Django's ORM is smart. When you assign a model instance (like <code>author</code>) to a <code>ForeignKey</code> field (like <code>Book.author</code>), the ORM uses the primary key of the assigned instance (i.e., <code>author.pk</code>) to set the foreign key column in the database (e.g., <code>author_id</code> in the <code>books</code> table).</li>
+<li>You could alternatively assign the primary key directly: <code>author_id=author.pk</code>, but assigning the instance itself is more idiomatic and often clearer.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>assert retrieved_book.author is not None</code></strong>:</p>
+<ul>
+<li>We verify that the book indeed has an associated author.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>assert retrieved_book.author.name == "George Orwell"</code></strong>:</p>
+<ul>
+<li>We can traverse the relationship. <code>retrieved_book.author</code> gives us the <code>Author</code> object related to the book. We then access its <code>name</code> attribute. This works because Django automatically fetches the related <code>Author</code> object when you access the <code>retrieved_book.author</code> attribute (this is typically a lazy load, meaning the database query for the author happens only when you first access <code>retrieved_book.author</code>).</li>
+</ul>
+</li>
+<li>
+<p><strong><code>assert retrieved_book.author.pk == author.pk</code></strong>:</p>
+<ul>
+<li>This confirms that the author associated with the retrieved book is indeed the same author record we initially created, by comparing their primary keys.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Benefits of This Approach for Test Data</strong></p>
+<ul>
+<li><strong>Clarity and Intent</strong>: Your test setup code clearly expresses the state of the data you require for the test.</li>
+<li><strong>Isolation</strong>: Combined with <code>@pytest.mark.django_db</code>, each test can create precisely the data it needs, starting from a clean slate (or within its own transaction). This prevents tests from interfering with each other due to pre-existing or leftover data.</li>
+<li><strong>Realism</strong>: You are using the same mechanisms (models, managers, <code>save()</code> methods) that your application uses, making your tests more representative of real-world scenarios.</li>
+<li><strong>Maintainability</strong>: If your model fields change, you'll likely get immediate errors in your test data setup code, prompting you to update it. This is much better than tests silently passing or failing due to stale, hardcoded fixture data.</li>
+</ul>
+<p>In summary, creating test data directly with the Django ORM is a fundamental skill for writing effective Django tests. It gives you fine-grained control over the state of your test database, ensuring that your tests are precise, isolated, and accurately reflect how your application interacts with its data. As we move on to testing specific model methods, views, and forms, this technique of ORM-based data creation will be used extensively.</p>
+<h2 id="53-asserting-field-values-and-defaults" tabindex="-1"><a class="anchor" href="#53-asserting-field-values-and-defaults" name="53-asserting-field-values-and-defaults" tabindex="-1"><span class="octicon octicon-link"></span></a>5.3 Asserting Field Values and Defaults</h2>
+<p>In the previous section, we learned how to create model instances within our tests using Django's ORM. This is a crucial first step. However, creating data is only half the story; we also need to verify that this data is correct and that our models behave as designed. This section focuses on asserting the values of your model fields, including those explicitly set and those assigned by Django's default mechanisms. Mastering these assertions is fundamental to building a reliable test suite that gives you confidence in your data layer.</p>
+<h3 id="531-verifying-explicitly-set-field-values" tabindex="-1"><a class="anchor" href="#531-verifying-explicitly-set-field-values" name="531-verifying-explicitly-set-field-values" tabindex="-1"><span class="octicon octicon-link"></span></a>5.3.1 Verifying Explicitly Set Field Values</h3>
+<p>When you create a model instance and provide specific values for its fields, you'll naturally want to confirm that these values have been correctly assigned and persisted. This ensures that the ORM is saving your data as intended and that your test setup accurately reflects the scenario you're trying to simulate.</p>
+<p>Let's consider a simple <code>Book</code> model. Imagine you have the following model defined in your app's <code>models.py</code> file:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># myapp/models.py</span>
+
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+
+<span class="token keyword">class</span> <span class="token class-name">Book</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    author <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">100</span><span class="token punctuation">)</span>
+    publication_year <span class="token operator">=</span> models<span class="token punctuation">.</span>IntegerField<span class="token punctuation">(</span>null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span> <span class="token comment"># Allows NULL in DB, and blank in forms</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+</code></pre>
+<p>Let's examine this model definition briefly:</p>
+<ol>
+<li><code>title = models.CharField(max_length=200)</code>: Defines a field to store the book's title as a string, with a maximum length of 200 characters.</li>
+<li><code>author = models.CharField(max_length=100)</code>: Defines a field for the author's name, also a string, up to 100 characters.</li>
+<li><code>publication_year = models.IntegerField(null=True, blank=True)</code>: This field is for the year of publication.
+<ul>
+<li><code>models.IntegerField</code>: Stores whole numbers.</li>
+<li><code>null=True</code>: This tells Django that this field can be <code>NULL</code> (empty) in the database.</li>
+<li><code>blank=True</code>: This is related to form validation and indicates that the field can be submitted as empty in a form. While related, for model-level testing, <code>null=True</code> is more directly relevant to whether the database allows the value to be absent.</li>
+</ul>
+</li>
+</ol>
+<p>Now, let's write a test to create a <code>Book</code> instance and assert its field values:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_models.py</span>
+
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> myapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Book <span class="token comment"># Assuming your app is named 'myapp'</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_creation_and_field_values</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Define the data for our new book</span>
+    book_title <span class="token operator">=</span> <span class="token string">"The Pragmatic Programmer"</span>
+    book_author <span class="token operator">=</span> <span class="token string">"Andy Hunt &amp; Dave Thomas"</span>
+    book_year <span class="token operator">=</span> <span class="token number">1999</span>
+
+    <span class="token comment"># Act: Create the Book instance using the ORM</span>
+    book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span>book_title<span class="token punctuation">,</span>
+        author<span class="token operator">=</span>book_author<span class="token punctuation">,</span>
+        publication_year<span class="token operator">=</span>book_year
+    <span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check that the fields were set correctly on the instance</span>
+    <span class="token keyword">assert</span> book<span class="token punctuation">.</span>title <span class="token operator">==</span> book_title
+    <span class="token keyword">assert</span> book<span class="token punctuation">.</span>author <span class="token operator">==</span> book_author
+    <span class="token keyword">assert</span> book<span class="token punctuation">.</span>publication_year <span class="token operator">==</span> book_year
+
+    <span class="token comment"># Assert: (Optional but good practice) Verify persistence by fetching from DB</span>
+    retrieved_book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token builtin">id</span><span class="token operator">=</span>book<span class="token punctuation">.</span><span class="token builtin">id</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>title <span class="token operator">==</span> book_title
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>author <span class="token operator">==</span> book_author
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>publication_year <span class="token operator">==</span> book_year
+</code></pre>
+<p>Let's break down this test code:</p>
+<ol>
+<li>
+<p><code>import pytest</code> and <code>from myapp.models import Book</code>: We import <code>pytest</code> itself (though not directly used in this simple test, it's good practice for test files) and our <code>Book</code> model.</p>
+</li>
+<li>
+<p><code>@pytest.mark.django_db</code>: As discussed in section 5.1, this marker is essential. It ensures that a test database is set up, migrations are run, and the database changes are rolled back after the test. Without it, <code>Book.objects.create()</code> would fail or interact with your development database, which is highly undesirable.</p>
+</li>
+<li>
+<p><code>def test_book_creation_and_field_values():</code>: This defines our test function. Pytest discovers functions prefixed with <code>test_</code>.</p>
+</li>
+<li>
+<p><strong>Arrange Phase</strong>:</p>
+<ul>
+<li><code>book_title = "The Pragmatic Programmer"</code></li>
+<li><code>book_author = "Andy Hunt &amp; Dave Thomas"</code></li>
+<li><code>book_year = 1999</code></li>
+<li>Here, we prepare the data we intend to use. Storing them in variables makes the <code>create</code> call and assertions cleaner.</li>
+</ul>
+</li>
+<li>
+<p><strong>Act Phase</strong>:</p>
+<ul>
+<li><code>book = Book.objects.create(...)</code>: This is the core action. We use the <code>create()</code> method on the model's manager (<code>Book.objects</code>) to simultaneously instantiate a <code>Book</code> object and save it to the test database. The keyword arguments (<code>title=...</code>, <code>author=...</code>) directly map to the model's fields.</li>
+</ul>
+</li>
+<li>
+<p><strong>Assert Phase (Initial Checks)</strong>:</p>
+<ul>
+<li><code>assert book.title == book_title</code>: We access the <code>title</code> attribute of the <code>book</code> instance (which now holds the data from the database) and assert that it matches our expected <code>book_title</code>.</li>
+<li><code>assert book.author == book_author</code>: Similarly, we check the <code>author</code>.</li>
+<li><code>assert book.publication_year == book_year</code>: And the <code>publication_year</code>.</li>
+<li><strong>Why this works</strong>: When you access <code>book.title</code>, Django's ORM provides the value that was just saved to, and implicitly reloaded from, the database record associated with this Python object.</li>
+</ul>
+</li>
+<li>
+<p><strong>Assert Phase (Verifying Persistence)</strong>:</p>
+<ul>
+<li><code>retrieved_book = Book.objects.get(id=book.id)</code>: This line explicitly fetches the record from the database using its primary key (<code>book.id</code>). This step is crucial because it confirms that the data isn't just correctly set on the Python object in memory immediately after creation, but that it was <em>actually written to and can be read back from the database</em>.</li>
+<li><code>assert retrieved_book.title == book_title</code> (and similar for other fields): We then perform the same assertions on this newly retrieved instance.</li>
+<li><strong>Why this is important</strong>: This guards against scenarios where the in-memory object might appear correct, but there was an issue during the database save operation (though <code>create()</code> usually raises an exception if the save fails). It provides stronger assurance.</li>
+</ul>
+</li>
+</ol>
+<p>This pattern of creating an object, then asserting its attributes, is fundamental. For more complex models, you'd simply extend this by asserting each relevant field.</p>
+<h3 id="532-understanding-and-asserting-default-values" tabindex="-1"><a class="anchor" href="#532-understanding-and-asserting-default-values" name="532-understanding-and-asserting-default-values" tabindex="-1"><span class="octicon octicon-link"></span></a>5.3.2 Understanding and Asserting Default Values</h3>
+<p>Django models allow you to specify <code>default</code> values for fields. These defaults are automatically applied when you create a new model instance without providing a value for that particular field. Testing these defaults is vital for several reasons:</p>
+<ul>
+<li><strong>Data Consistency</strong>: Ensures that optional fields or fields with a sensible starting state are initialized correctly.</li>
+<li><strong>Behavioral Contract</strong>: Verifies that the model behaves as documented or intended regarding its initial state.</li>
+<li><strong>Regression Prevention</strong>: Protects against accidental modifications to default values in your <code>models.py</code> file that could lead to unexpected behavior or data.</li>
+</ul>
+<p>Let's enhance our <code>Book</code> model to include a field with a default value:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># myapp/models.py (updated)</span>
+
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+<span class="token comment"># from django.utils import timezone # We'll use this later</span>
+
+<span class="token keyword">class</span> <span class="token class-name">Book</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    author <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">100</span><span class="token punctuation">)</span>
+    publication_year <span class="token operator">=</span> models<span class="token punctuation">.</span>IntegerField<span class="token punctuation">(</span>null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    status <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>
+        max_length<span class="token operator">=</span><span class="token number">20</span><span class="token punctuation">,</span>
+        choices<span class="token operator">=</span><span class="token punctuation">[</span><span class="token punctuation">(</span><span class="token string">'AVAILABLE'</span><span class="token punctuation">,</span> <span class="token string">'Available'</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">'ON_LOAN'</span><span class="token punctuation">,</span> <span class="token string">'On Loan'</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token punctuation">(</span><span class="token string">'RESERVED'</span><span class="token punctuation">,</span> <span class="token string">'Reserved'</span><span class="token punctuation">)</span><span class="token punctuation">]</span><span class="token punctuation">,</span>
+        default<span class="token operator">=</span><span class="token string">'AVAILABLE'</span>  <span class="token comment"># Our new default value</span>
+    <span class="token punctuation">)</span>
+    <span class="token comment"># Field to demonstrate implicit None default</span>
+    summary <span class="token operator">=</span> models<span class="token punctuation">.</span>TextField<span class="token punctuation">(</span>null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    <span class="token comment"># Example of a callable default (testing this precisely is more advanced)</span>
+    <span class="token comment"># created_at = models.DateTimeField(default=timezone.now)</span>
+
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+</code></pre>
+<p>Key changes to the model:</p>
+<ol>
+<li><code>status = models.CharField(...)</code>: We've added a <code>status</code> field.
+<ul>
+<li><code>choices=[...]</code>: This provides a list of valid options for the <code>status</code> field. Django can use this for validation and for rendering select widgets in forms. For our model tests, it primarily defines the universe of expected values.</li>
+<li><code>default='AVAILABLE'</code>: This is the crucial part. If we create a <code>Book</code> instance and don't specify a <code>status</code>, Django will automatically set it to <code>'AVAILABLE'</code>.</li>
+</ul>
+</li>
+<li><code>summary = models.TextField(null=True, blank=True)</code>: A <code>TextField</code> for a longer summary. Importantly, it has <code>null=True</code> but <em>no explicit <code>default</code> value</em>. We'll see how this behaves.</li>
+</ol>
+<p>Now, let's write tests for these default values:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_models.py (new tests added)</span>
+
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> myapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Book <span class="token comment"># Assuming your app is named 'myapp'</span>
+
+<span class="token comment"># ... (test_book_creation_and_field_values from before) ...</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_status_default_value</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Data for a book, omitting the 'status' field</span>
+    book_title <span class="token operator">=</span> <span class="token string">"Clean Code"</span>
+    book_author <span class="token operator">=</span> <span class="token string">"Robert C. Martin"</span>
+
+    <span class="token comment"># Act: Create the Book instance without specifying 'status'</span>
+    book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span>book_title<span class="token punctuation">,</span>
+        author<span class="token operator">=</span>book_author
+    <span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check that the 'status' field has its default value</span>
+    <span class="token keyword">assert</span> book<span class="token punctuation">.</span>status <span class="token operator">==</span> <span class="token string">'AVAILABLE'</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_status_override_default</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Data for a book, explicitly setting 'status'</span>
+    book_title <span class="token operator">=</span> <span class="token string">"Domain-Driven Design"</span>
+    book_author <span class="token operator">=</span> <span class="token string">"Eric Evans"</span>
+    custom_status <span class="token operator">=</span> <span class="token string">'ON_LOAN'</span>
+
+    <span class="token comment"># Act: Create the Book instance, overriding the default 'status'</span>
+    book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span>book_title<span class="token punctuation">,</span>
+        author<span class="token operator">=</span>book_author<span class="token punctuation">,</span>
+        status<span class="token operator">=</span>custom_status  <span class="token comment"># Explicitly providing a status</span>
+    <span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check that the 'status' field has the overridden value</span>
+    <span class="token keyword">assert</span> book<span class="token punctuation">.</span>status <span class="token operator">==</span> custom_status
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_book_summary_default_is_none</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Data for a book, omitting 'summary'</span>
+    book_title <span class="token operator">=</span> <span class="token string">"Test Driven Development"</span>
+    book_author <span class="token operator">=</span> <span class="token string">"Kent Beck"</span>
+
+    <span class="token comment"># Act: Create the Book instance without specifying 'summary'</span>
+    book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span>book_title<span class="token punctuation">,</span>
+        author<span class="token operator">=</span>book_author
+    <span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check that 'summary' is None, as it's nullable and has no explicit default</span>
+    <span class="token keyword">assert</span> book<span class="token punctuation">.</span>summary <span class="token keyword">is</span> <span class="token boolean">None</span>
+    <span class="token comment"># Also verify it's None in the database</span>
+    retrieved_book <span class="token operator">=</span> Book<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>get<span class="token punctuation">(</span><span class="token builtin">id</span><span class="token operator">=</span>book<span class="token punctuation">.</span><span class="token builtin">id</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> retrieved_book<span class="token punctuation">.</span>summary <span class="token keyword">is</span> <span class="token boolean">None</span>
+</code></pre>
+<p>Let's analyze these new tests:</p>
+<p><strong><code>test_book_status_default_value</code></strong>:</p>
+<ol>
+<li><strong>Arrange</strong>: We prepare data for a new book but deliberately <em>do not</em> include a value for <code>status</code>.</li>
+<li><strong>Act</strong>: <code>Book.objects.create(title=book_title, author=book_author)</code> is called.
+<ul>
+<li><strong>Under the Hood (Mental Model)</strong>: When Django processes this <code>create()</code> call, it inspects the <code>Book</code> model's definition. It sees that the <code>status</code> field has a <code>default='AVAILABLE'</code> attribute. Since <code>status</code> was not provided in the <code>create()</code> call, Django automatically assigns this default value to the <code>status</code> field of the new instance <em>before</em> saving it to the database.</li>
+</ul>
+</li>
+<li><strong>Assert</strong>: <code>assert book.status == 'AVAILABLE'</code>. This confirms that our expectation about the default value matches the actual behavior of the model.</li>
+</ol>
+<p><strong><code>test_book_status_override_default</code></strong>:</p>
+<ol>
+<li><strong>Arrange</strong>: This time, we <em>do</em> provide a <code>custom_status = 'ON_LOAN'</code>.</li>
+<li><strong>Act</strong>: <code>Book.objects.create(..., status=custom_status)</code>.
+<ul>
+<li><strong>Under the Hood (Mental Model)</strong>: Django sees that a value for <code>status</code> <em>is</em> provided in the <code>create()</code> call. Therefore, it uses this provided value (<code>'ON_LOAN'</code>) instead of the <code>default</code> specified in the model definition.</li>
+</ul>
+</li>
+<li><strong>Assert</strong>: <code>assert book.status == custom_status</code>. This verifies that we can successfully override the default value when needed.</li>
+</ol>
+<p><strong><code>test_book_summary_default_is_none</code></strong>:</p>
+<ol>
+<li><strong>Arrange</strong>: We create a book without providing a <code>summary</code>.</li>
+<li><strong>Act</strong>: <code>Book.objects.create(...)</code> is called.
+<ul>
+<li><strong>Under the Hood (Mental Model)</strong>: The <code>summary</code> field is defined as <code>models.TextField(null=True, blank=True)</code>. Critically, it does <em>not</em> have an explicit <code>default</code> attribute in its definition.</li>
+<li>When a field allows <code>NULL</code> at the database level (<code>null=True</code>) and no explicit <code>default</code> is provided in the model, and no value is given during instance creation, Django will store <code>NULL</code> in the database for that field. In Python, this database <code>NULL</code> is represented as <code>None</code>.</li>
+</ul>
+</li>
+<li><strong>Assert</strong>:
+<ul>
+<li><code>assert book.summary is None</code>: We check that the <code>summary</code> attribute on the Python instance is <code>None</code>.</li>
+<li><code>retrieved_book = Book.objects.get(id=book.id)</code> and <code>assert retrieved_book.summary is None</code>: We re-fetch the object from the database to confirm that <code>NULL</code> was indeed stored and is correctly interpreted back as <code>None</code>.</li>
+<li><strong>Important Distinction</strong>: If <code>summary</code> was a <code>CharField</code> with <code>default=""</code> (an empty string), then <code>book.summary</code> would be <code>""</code>, not <code>None</code>. If it was <code>CharField(null=False, blank=False)</code> and no default, <code>create()</code> would likely raise an <code>IntegrityError</code> if you didn't provide a value, as the database would require a non-null value. The combination of <code>null=True</code> and no explicit <code>default</code> leads to <code>None</code>.</li>
+</ul>
+</li>
+</ol>
+<p><strong>A Note on Callable Defaults (e.g., <code>default=timezone.now</code>)</strong>:
+Our <code>Book</code> model (commented out) had an example: <code>created_at = models.DateTimeField(default=timezone.now)</code>. Here, <code>timezone.now</code> is a function. Django calls this function each time a new <code>Book</code> instance needs a default value for <code>created_at</code>.
+Testing these precisely can be trickier because the exact microsecond value is unpredictable. Common strategies (which we'll explore in later chapters) include:</p>
+<ul>
+<li>Asserting the field is not <code>None</code> and is of the correct type (e.g., <code>assert isinstance(book.created_at, datetime)</code>).</li>
+<li>Asserting the value is "close enough" to the current time.</li>
+<li>Using tools to "freeze" time during a test (e.g., the <code>freezegun</code> library).
+For now, focus on understanding and testing static defaults as shown.</li>
+</ul>
+<h3 id="533-practical-considerations-and-best-practices" tabindex="-1"><a class="anchor" href="#533-practical-considerations-and-best-practices" name="533-practical-considerations-and-best-practices" tabindex="-1"><span class="octicon octicon-link"></span></a>5.3.3 Practical Considerations and Best Practices</h3>
+<ul>
+<li><strong>Test All Defaults</strong>: If a field has a <code>default</code> in your model, write a test for it. It's a low-effort way to catch regressions.</li>
+<li><strong>Clarity in Assertions</strong>: Be explicit. <code>assert foo == expected</code> is clearer than <code>assert foo</code> if <code>foo</code> could be an empty string or <code>0</code> which might be valid non-default values. Use <code>assert foo is None</code> for checking <code>None</code>.</li>
+<li><strong>Focus on Your Model's Logic</strong>: You're not testing Django's ability to set a default; you're testing that <em>your specific model</em> is configured with the <em>correct</em> default and that this configuration works as you intend.</li>
+<li><strong>Keep Model Tests Fast</strong>: Asserting field values and defaults are typically very fast operations. They form an essential part of your unit test suite for models, providing quick feedback.</li>
+<li><strong>Distinguish from Validation</strong>: Testing default values is about the initial state of an object upon creation if a value isn't provided. This is different from testing model validation (e.g., <code>full_clean()</code> method or form validation), which checks if provided data conforms to constraints (like <code>max_length</code>, <code>choices</code>, custom validation rules). We'll cover model validation testing later.</li>
+</ul>
+<p>By diligently asserting field values and defaults, you build a strong foundation of trust in your Django models. These tests act as a safety net, ensuring that the basic data contracts of your models are upheld as your application evolves.</p>
+<h3 id="54-testing-custom-properties-and-methods-property-def-my_method" tabindex="-1"><a class="anchor" href="#54-testing-custom-properties-and-methods-property-def-my_method" name="54-testing-custom-properties-and-methods-property-def-my_method" tabindex="-1"><span class="octicon octicon-link"></span></a>5.4 Testing Custom Properties and Methods (<code>@property</code>, <code>def my_method</code>)</h3>
+<p>Django models are more than just definitions of database tables and fields; they are Python classes. This means you can equip them with custom methods and properties to encapsulate business logic, derive computed values, or provide convenient helper functionalities directly related to the data they represent. Adding such logic to your models promotes the Don't Repeat Yourself (DRY) principle and keeps data-related operations closely tied to the data itself, leading to a cleaner and more maintainable codebase.</p>
+<p>In this section, we'll explore how to test these custom instance methods and properties. Understanding how to test them is crucial because they often contain vital business rules or data transformations that your application relies upon.</p>
+<p><strong>What are Custom Instance Methods?</strong></p>
+<p>An instance method in a Python class (and therefore in a Django model) is a function defined within the class that operates on an instance of that class. It always takes <code>self</code> as its first argument, which refers to the instance itself, allowing the method to access and/or modify the instance's attributes.</p>
+<p><strong>What are Custom Properties?</strong></p>
+<p>Python's <code>@property</code> decorator allows you to define a method that can be accessed like an attribute (i.e., without calling it with parentheses <code>()</code>). This is useful for creating "computed attributes" whose values are derived from other attributes or logic, but which you want to present to the user of the class as if they were regular stored fields.</p>
+<p>Let's consider a practical example. Suppose we have a <code>Profile</code> model:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># myapp/models.py</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">import</span> datetime
+
+<span class="token keyword">class</span> <span class="token class-name">Profile</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    first_name <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">50</span><span class="token punctuation">)</span>
+    last_name <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">50</span><span class="token punctuation">)</span>
+    birth_date <span class="token operator">=</span> models<span class="token punctuation">.</span>DateField<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">get_full_name</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Returns the person's full name.
+        """</span>
+        <span class="token keyword">return</span> <span class="token string-interpolation"><span class="token string">f"</span><span class="token interpolation"><span class="token punctuation">{</span>self<span class="token punctuation">.</span>first_name<span class="token punctuation">}</span></span><span class="token string"> </span><span class="token interpolation"><span class="token punctuation">{</span>self<span class="token punctuation">.</span>last_name<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+
+    <span class="token decorator annotation punctuation">@property</span>
+    <span class="token keyword">def</span> <span class="token function">age</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Calculates the current age based on birth_date.
+        """</span>
+        today <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token comment"># Calculate years difference</span>
+        years <span class="token operator">=</span> today<span class="token punctuation">.</span>year <span class="token operator">-</span> self<span class="token punctuation">.</span>birth_date<span class="token punctuation">.</span>year
+        <span class="token comment"># Adjust if birthday hasn't occurred yet this year</span>
+        <span class="token keyword">if</span> <span class="token punctuation">(</span>today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day<span class="token punctuation">)</span> <span class="token operator">&lt;</span> <span class="token punctuation">(</span>self<span class="token punctuation">.</span>birth_date<span class="token punctuation">.</span>month<span class="token punctuation">,</span> self<span class="token punctuation">.</span>birth_date<span class="token punctuation">.</span>day<span class="token punctuation">)</span><span class="token punctuation">:</span>
+            years <span class="token operator">-=</span> <span class="token number">1</span>
+        <span class="token keyword">return</span> years
+
+    <span class="token decorator annotation punctuation">@property</span>
+    <span class="token keyword">def</span> <span class="token function">is_adult</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Determines if the person is 18 years or older.
+        """</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>age <span class="token operator">&gt;=</span> <span class="token number">18</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>get_full_name<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+</code></pre>
+<p>Let's break down this <code>Profile</code> model:</p>
+<ol>
+<li><strong><code>first_name</code>, <code>last_name</code>, <code>birth_date</code></strong>: These are standard Django model fields storing basic information.</li>
+<li><strong><code>get_full_name(self)</code> method</strong>:
+<ul>
+<li>This is a regular instance method.</li>
+<li>It takes <code>self</code> (the instance of the <code>Profile</code> model) as its argument.</li>
+<li>It constructs and returns a string representing the full name by concatenating <code>self.first_name</code> and <code>self.last_name</code>.</li>
+<li>To use it, you would call <code>profile_instance.get_full_name()</code>.</li>
+</ul>
+</li>
+<li><strong><code>@property def age(self)</code></strong>:
+<ul>
+<li>The <code>@property</code> decorator transforms the <code>age</code> method into a property.</li>
+<li>It calculates the current age of the person based on their <code>birth_date</code> and the current date.
+<ul>
+<li><code>today = timezone.now().date()</code>: Gets the current date. Using <code>timezone.now().date()</code> is important for timezone-aware applications.</li>
+<li><code>years = today.year - self.birth_date.year</code>: Calculates the initial difference in years.</li>
+<li><code>if (today.month, today.day) &lt; (self.birth_date.month, self.birth_date.day): years -= 1</code>: This crucial piece of logic checks if the current month and day are before the birth month and day. If so, it means the person hasn't had their birthday yet this year, so we subtract one year from the calculated age. This ensures accuracy.</li>
+</ul>
+</li>
+<li>To use it, you would access <code>profile_instance.age</code> (notice no parentheses).</li>
+</ul>
+</li>
+<li><strong><code>@property def is_adult(self)</code></strong>:
+<ul>
+<li>This is another property.</li>
+<li>It leverages the <code>self.age</code> property (which we just defined) to determine if the person is 18 years or older.</li>
+<li>This demonstrates how properties can build upon each other, encapsulating logic neatly.</li>
+<li>To use it, you would access <code>profile_instance.is_adult</code>.</li>
+</ul>
+</li>
+<li><strong><code>__str__(self)</code></strong>: A standard Python method that Django uses to represent the object as a string, here conveniently using our custom <code>get_full_name</code> method.</li>
+</ol>
+<p>Now, let's write tests for these custom methods and properties. We'll create a <code>tests/test_models.py</code> file (or add to an existing one).</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># myapp/tests/test_models.py</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">import</span> datetime
+<span class="token keyword">from</span> myapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Profile <span class="token comment"># Assuming your app is named 'myapp'</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">class</span> <span class="token class-name">TestProfileModel</span><span class="token punctuation">:</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_get_full_name</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Arrange: Create a Profile instance</span>
+        profile <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"Jane"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Doe"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token number">1990</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># Act: Call the custom method</span>
+        full_name <span class="token operator">=</span> profile<span class="token punctuation">.</span>get_full_name<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        
+        <span class="token comment"># Assert: Check if the returned value is correct</span>
+        <span class="token keyword">assert</span> full_name <span class="token operator">==</span> <span class="token string">"Jane Doe"</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_age_calculation</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Arrange: Define a birth date that makes age calculation specific</span>
+        <span class="token comment"># For this test, let's assume today is 2023-10-27 for predictable results.</span>
+        <span class="token comment"># In a real test, you might mock timezone.now() for full control,</span>
+        <span class="token comment"># but for simplicity here, we'll calculate based on a known offset.</span>
+        
+        <span class="token comment"># Let's set a birth_date such that the person is exactly 25.</span>
+        <span class="token comment"># If today is 2023-10-27, birth_date = 1998-10-27 means 25.</span>
+        <span class="token comment"># If birthday hasn't passed this year: 1998-11-01 means 24.</span>
+        
+        <span class="token comment"># Case 1: Birthday already passed this year</span>
+        birth_date_passed <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> datetime<span class="token punctuation">.</span>timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token punctuation">(</span><span class="token number">25</span> <span class="token operator">*</span> <span class="token number">365</span> <span class="token operator">+</span> <span class="token number">6</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token comment"># Approx 25 years ago (accounting for leap years)</span>
+        profile_passed <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"Alice"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Smith"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>birth_date_passed
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># Act &amp; Assert for Case 1</span>
+        <span class="token keyword">assert</span> profile_passed<span class="token punctuation">.</span>age <span class="token operator">==</span> <span class="token number">25</span>
+
+        <span class="token comment"># Case 2: Birthday not yet passed this year</span>
+        <span class="token comment"># To ensure birthday hasn't passed, set birth_date to tomorrow's date, 25 years ago</span>
+        <span class="token comment"># This logic is a bit tricky to make perfectly robust without mocking date,</span>
+        <span class="token comment"># so for a simpler, more direct test:</span>
+        today <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        birth_date_future_bday <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">25</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day <span class="token operator">+</span> <span class="token number">1</span> <span class="token keyword">if</span> today<span class="token punctuation">.</span>day <span class="token operator">&lt;</span> <span class="token number">28</span> <span class="token keyword">else</span> today<span class="token punctuation">.</span>day <span class="token operator">-</span><span class="token number">1</span> <span class="token punctuation">)</span> <span class="token comment"># ensure valid date</span>
+        <span class="token comment"># If today is Oct 27, 2023, this would be e.g., Oct 28, 1998. Age should be 24.</span>
+        <span class="token comment"># A more robust way for this specific test case:</span>
+        <span class="token comment"># Create a birth_date that is 25 years ago from today, but one day *after* today's month/day.</span>
+        <span class="token comment"># This ensures the "birthday hasn't occurred yet" logic is triggered.</span>
+        <span class="token keyword">if</span> today<span class="token punctuation">.</span>month <span class="token operator">==</span> <span class="token number">12</span> <span class="token keyword">and</span> today<span class="token punctuation">.</span>day <span class="token operator">==</span> <span class="token number">31</span><span class="token punctuation">:</span> <span class="token comment"># Edge case: end of year</span>
+            birth_date_not_passed_this_year <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">25</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span> <span class="token comment"># Born Jan 1st, effectively 24</span>
+        <span class="token keyword">else</span><span class="token punctuation">:</span>
+            <span class="token comment"># Try to set birthday for tomorrow, 25 years ago</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                birth_date_not_passed_this_year <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">25</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span>
+            <span class="token keyword">except</span> ValueError<span class="token punctuation">:</span> <span class="token comment"># Handle end of month</span>
+                <span class="token keyword">try</span><span class="token punctuation">:</span>
+                    birth_date_not_passed_this_year <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">25</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+                <span class="token keyword">except</span> ValueError<span class="token punctuation">:</span> <span class="token comment"># Handle end of year / next month</span>
+                     birth_date_not_passed_this_year <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">25</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+
+
+        profile_not_passed <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"Bob"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Johnson"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>birth_date_not_passed_this_year
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># Act &amp; Assert for Case 2</span>
+        <span class="token comment"># Given the birth_date_not_passed_this_year logic, the age should be 24</span>
+        <span class="token keyword">assert</span> profile_not_passed<span class="token punctuation">.</span>age <span class="token operator">==</span> <span class="token number">24</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"Calculated age </span><span class="token interpolation"><span class="token punctuation">{</span>profile_not_passed<span class="token punctuation">.</span>age<span class="token punctuation">}</span></span><span class="token string"> for </span><span class="token interpolation"><span class="token punctuation">{</span>birth_date_not_passed_this_year<span class="token punctuation">}</span></span><span class="token string"> on </span><span class="token interpolation"><span class="token punctuation">{</span>today<span class="token punctuation">}</span></span><span class="token string"> was not 24."</span></span>
+
+
+    <span class="token keyword">def</span> <span class="token function">test_is_adult_property</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Arrange</span>
+        <span class="token comment"># Case 1: Adult (e.g., 20 years old)</span>
+        <span class="token comment"># To make it robust, calculate a birth_date that makes them 20.</span>
+        today <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        adult_birth_date <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">20</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day<span class="token punctuation">)</span>
+        profile_adult <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"Carol"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Williams"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>adult_birth_date
+        <span class="token punctuation">)</span>
+
+        <span class="token comment"># Case 2: Minor (e.g., 17 years old)</span>
+        minor_birth_date <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">17</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day<span class="token punctuation">)</span>
+        profile_minor <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"David"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Brown"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>minor_birth_date
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># Act &amp; Assert</span>
+        <span class="token keyword">assert</span> profile_adult<span class="token punctuation">.</span>is_adult <span class="token keyword">is</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"Adult profile age </span><span class="token interpolation"><span class="token punctuation">{</span>profile_adult<span class="token punctuation">.</span>age<span class="token punctuation">}</span></span><span class="token string"> not considered adult."</span></span>
+        <span class="token keyword">assert</span> profile_minor<span class="token punctuation">.</span>is_adult <span class="token keyword">is</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"Minor profile age </span><span class="token interpolation"><span class="token punctuation">{</span>profile_minor<span class="token punctuation">.</span>age<span class="token punctuation">}</span></span><span class="token string"> not considered minor."</span></span>
+
+    <span class="token keyword">def</span> <span class="token function">test_is_adult_edge_case_exactly_18</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Arrange: Person who is exactly 18 today</span>
+        today <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        eighteen_birth_date <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">18</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day<span class="token punctuation">)</span>
+        profile_eighteen <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"Eve"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Davis"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>eighteen_birth_date
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># Act &amp; Assert</span>
+        <span class="token keyword">assert</span> profile_eighteen<span class="token punctuation">.</span>is_adult <span class="token keyword">is</span> <span class="token boolean">True</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"Profile aged </span><span class="token interpolation"><span class="token punctuation">{</span>profile_eighteen<span class="token punctuation">.</span>age<span class="token punctuation">}</span></span><span class="token string"> (exactly 18) not considered adult."</span></span>
+
+    <span class="token keyword">def</span> <span class="token function">test_is_adult_edge_case_day_before_18th_birthday</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Arrange: Person whose 18th birthday is tomorrow</span>
+        today <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>date<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        <span class="token comment"># To get day before 18th, we need birth_date to be (today.year - 18) and (today.month, today.day + 1)</span>
+        <span class="token keyword">try</span><span class="token punctuation">:</span>
+            day_before_18_birth_date <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">18</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month<span class="token punctuation">,</span> today<span class="token punctuation">.</span>day <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        <span class="token keyword">except</span> ValueError<span class="token punctuation">:</span> <span class="token comment"># Handles end of month</span>
+            <span class="token keyword">try</span><span class="token punctuation">:</span>
+                day_before_18_birth_date <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">18</span><span class="token punctuation">,</span> today<span class="token punctuation">.</span>month <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+            <span class="token keyword">except</span> ValueError<span class="token punctuation">:</span> <span class="token comment"># Handles end of year</span>
+                day_before_18_birth_date <span class="token operator">=</span> datetime<span class="token punctuation">.</span>date<span class="token punctuation">(</span>today<span class="token punctuation">.</span>year <span class="token operator">-</span> <span class="token number">18</span> <span class="token operator">+</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">,</span> <span class="token number">1</span><span class="token punctuation">)</span>
+        
+        profile_almost_eighteen <span class="token operator">=</span> Profile<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+            first_name<span class="token operator">=</span><span class="token string">"Frank"</span><span class="token punctuation">,</span>
+            last_name<span class="token operator">=</span><span class="token string">"Miller"</span><span class="token punctuation">,</span>
+            birth_date<span class="token operator">=</span>day_before_18_birth_date
+        <span class="token punctuation">)</span>
+        
+        <span class="token comment"># Act &amp; Assert</span>
+        <span class="token comment"># This person's age should be 17</span>
+        <span class="token keyword">assert</span> profile_almost_eighteen<span class="token punctuation">.</span>age <span class="token operator">==</span> <span class="token number">17</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"Expected age 17, got </span><span class="token interpolation"><span class="token punctuation">{</span>profile_almost_eighteen<span class="token punctuation">.</span>age<span class="token punctuation">}</span></span><span class="token string">"</span></span>
+        <span class="token keyword">assert</span> profile_almost_eighteen<span class="token punctuation">.</span>is_adult <span class="token keyword">is</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string-interpolation"><span class="token string">f"Profile aged </span><span class="token interpolation"><span class="token punctuation">{</span>profile_almost_eighteen<span class="token punctuation">.</span>age<span class="token punctuation">}</span></span><span class="token string"> (day before 18th) considered adult."</span></span>
+
+</code></pre>
+<p>Let's examine this test code in detail:</p>
+<ol>
+<li><strong><code>import pytest</code></strong>: Imports the pytest library.</li>
+<li><strong><code>from django.utils import timezone</code> and <code>import datetime</code></strong>: These are imported to help us work with dates, especially for setting <code>birth_date</code> values and for the logic within our model's <code>age</code> property.</li>
+<li><strong><code>from myapp.models import Profile</code></strong>: Imports the <code>Profile</code> model we want to test. Replace <code>myapp</code> with the actual name of your Django app.</li>
+<li><strong><code>@pytest.mark.django_db</code></strong>:
+<ul>
+<li>This marker is crucial. As discussed in Chapter 4 and 5.1, it ensures that a test database is set up and that our model instance creations (<code>Profile.objects.create(...)</code>) interact with this isolated database.</li>
+<li>Even though some of these methods/properties might not directly query the database <em>after</em> the instance is created (e.g., <code>get_full_name</code> only uses instance attributes), creating the instance itself via the ORM (<code>.objects.create()</code>) is a database operation. Thus, <code>django_db</code> is necessary.</li>
+</ul>
+</li>
+<li><strong><code>class TestProfileModel:</code></strong>: We group our model-related tests within a class for better organization. Pytest will discover methods within this class that start with <code>test_</code>.</li>
+</ol>
+<p><strong>Explaining <code>test_get_full_name(self)</code>:</strong></p>
+<ol>
+<li><strong><code># Arrange: Create a Profile instance</code></strong>:
+<ul>
+<li><code>profile = Profile.objects.create(...)</code>: We use the Django ORM to create a new <code>Profile</code> record in the test database and get an instance of it. We provide specific values for <code>first_name</code>, <code>last_name</code>, and <code>birth_date</code>.</li>
+<li>This step sets up the necessary state for our test.</li>
+</ul>
+</li>
+<li><strong><code># Act: Call the custom method</code></strong>:
+<ul>
+<li><code>full_name = profile.get_full_name()</code>: We call the <code>get_full_name</code> method on our <code>profile</code> instance. This is the core action we are testing.</li>
+</ul>
+</li>
+<li><strong><code># Assert: Check if the returned value is correct</code></strong>:
+<ul>
+<li><code>assert full_name == "Jane Doe"</code>: We use pytest's <code>assert</code> statement to verify that the value returned by <code>get_full_name()</code> is what we expect ("Jane Doe"). If it's not, the test will fail.</li>
+<li>This pattern (Arrange, Act, Assert) is fundamental to writing clear and understandable tests.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Explaining <code>test_age_calculation(self)</code>:</strong></p>
+<p>This test is more complex because the <code>age</code> property involves date logic that depends on the current day.</p>
+<ol>
+<li><strong><code># Arrange</code></strong>:
+<ul>
+<li>The comments highlight the challenge: for truly predictable results across different execution times, one might "mock" <code>timezone.now()</code>. Mocking is an advanced technique (covered briefly in Chapter 20) where you replace parts of your system with predictable, controlled substitutes during tests. For now, we're calculating birth dates relative to the <em>actual</em> current date.</li>
+<li><strong><code># Case 1: Birthday already passed this year</code></strong>:
+<ul>
+<li><code>birth_date_passed = timezone.now().date() - datetime.timedelta(days=(25 * 365 + 6))</code>: We calculate a birth date that is approximately 25 years ago. The <code>+ 6</code> is a rough estimate for leap days over 25 years. The goal is to create a <code>Profile</code> instance that is definitively 25 years old, assuming their birthday has already occurred this year.</li>
+<li><code>profile_passed = Profile.objects.create(...)</code>: Creates the profile.</li>
+</ul>
+</li>
+<li><strong><code># Act &amp; Assert for Case 1</code></strong>:
+<ul>
+<li><code>assert profile_passed.age == 25</code>: We access the <code>age</code> property (note: no <code>()</code>) and assert it's 25.</li>
+</ul>
+</li>
+<li><strong><code># Case 2: Birthday not yet passed this year</code></strong>:
+<ul>
+<li>The logic here (<code>birth_date_not_passed_this_year = ...</code>) is designed to create a birth date that was 25 years ago, but where the month/day is <em>after</em> today's month/day. This specifically tests the part of our <code>age</code> property that subtracts 1 year if the birthday hasn't occurred yet.</li>
+<li>The <code>try-except</code> blocks handle edge cases like the end of the month or year to ensure a valid date is constructed. This demonstrates that testing can sometimes reveal the need for careful handling of edge conditions in your main code or in your test setup.</li>
+<li><code>profile_not_passed = Profile.objects.create(...)</code>: Creates the second profile.</li>
+</ul>
+</li>
+<li><strong><code># Act &amp; Assert for Case 2</code></strong>:
+<ul>
+<li><code>assert profile_not_passed.age == 24, ...</code>: We assert that this profile's age is 24. The custom message in the assert provides more context if it fails.</li>
+</ul>
+</li>
+<li><strong>Why this complexity?</strong> The <code>age</code> property's logic depends on the <em>current date</em>. To test it thoroughly without mocking, we need to construct <code>birth_date</code> values that specifically exercise both branches of its internal <code>if</code> condition (birthday passed vs. not passed this year). This makes the test setup a bit more involved but ensures our age calculation is robust.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Explaining <code>test_is_adult_property(self)</code>:</strong></p>
+<p>This test checks the <code>is_adult</code> property, which itself relies on the <code>age</code> property.</p>
+<ol>
+<li><strong><code># Arrange</code></strong>:
+<ul>
+<li><strong><code># Case 1: Adult (e.g., 20 years old)</code></strong>:
+<ul>
+<li><code>today = timezone.now().date()</code></li>
+<li><code>adult_birth_date = datetime.date(today.year - 20, today.month, today.day)</code>: We construct a birth date that makes the person exactly 20 years old today.</li>
+<li><code>profile_adult = Profile.objects.create(...)</code>: Creates the adult profile.</li>
+</ul>
+</li>
+<li><strong><code># Case 2: Minor (e.g., 17 years old)</code></strong>:
+<ul>
+<li><code>minor_birth_date = datetime.date(today.year - 17, today.month, today.day)</code>: Constructs a birth date for someone who is 17 today.</li>
+<li><code>profile_minor = Profile.objects.create(...)</code>: Creates the minor profile.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong><code># Act &amp; Assert</code></strong>:
+<ul>
+<li><code>assert profile_adult.is_adult is True</code>: We access the <code>is_adult</code> property for the adult profile and assert it's <code>True</code>. We use <code>is True</code> for boolean checks for clarity.</li>
+<li><code>assert profile_minor.is_adult is False</code>: Similarly, we assert the minor profile's <code>is_adult</code> property is <code>False</code>.</li>
+<li>The custom messages provide context on failure, including the calculated age, which can be helpful for debugging.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Explaining <code>test_is_adult_edge_case_exactly_18(self)</code> and <code>test_is_adult_edge_case_day_before_18th_birthday(self)</code>:</strong></p>
+<p>These tests focus on boundary conditions for the <code>is_adult</code> property, which are common sources of bugs.</p>
+<ol>
+<li><strong><code>test_is_adult_edge_case_exactly_18</code></strong>:
+<ul>
+<li><strong><code># Arrange</code></strong>: Creates a profile for someone whose 18th birthday is <em>today</em>.
+<ul>
+<li><code>eighteen_birth_date = datetime.date(today.year - 18, today.month, today.day)</code></li>
+</ul>
+</li>
+<li><strong><code># Act &amp; Assert</code></strong>:
+<ul>
+<li><code>assert profile_eighteen.is_adult is True</code>: Verifies they are considered an adult.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong><code>test_is_adult_edge_case_day_before_18th_birthday</code></strong>:
+<ul>
+<li><strong><code># Arrange</code></strong>: Creates a profile for someone whose 18th birthday is <em>tomorrow</em>.
+<ul>
+<li>The <code>day_before_18_birth_date</code> calculation is similar to the one in <code>test_age_calculation</code> to ensure the birthday is tomorrow relative to the current date, handling month/year ends.</li>
+</ul>
+</li>
+<li><strong><code># Act &amp; Assert</code></strong>:
+<ul>
+<li><code>assert profile_almost_eighteen.age == 17</code>: First, we confirm our setup is correct and their calculated age is indeed 17. This is a good practice: assert intermediate assumptions if they are critical for the main assertion.</li>
+<li><code>assert profile_almost_eighteen.is_adult is False</code>: Verifies they are <em>not</em> yet considered an adult.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p><strong>Why Test Custom Methods and Properties?</strong></p>
+<ul>
+<li><strong>Encapsulated Logic</strong>: These methods and properties often contain business logic (e.g., how to calculate an age, determine adult status, format a name). Testing them ensures this logic is correct.</li>
+<li><strong>Prevent Regressions</strong>: As your models evolve or related code changes, these tests act as a safety net, ensuring that previously working logic doesn't break.</li>
+<li><strong>Documentation</strong>: Well-written tests serve as executable documentation, demonstrating how these methods/properties are intended to be used and what their expected outcomes are.</li>
+<li><strong>Confidence in Refactoring</strong>: If you decide to refactor the internal implementation of <code>age</code> or <code>get_full_name</code>, as long as your tests pass, you can be confident that the external behavior remains unchanged.</li>
+</ul>
+<p>By testing these custom additions to your Django models, you are essentially unit testing small, focused pieces of your model's behavior. This contributes to a more robust and reliable application, as the foundational data objects and their associated logic are verified. Remember, the goal is to ensure that each component, no matter how small, behaves as expected.</p>
+<h2 id="55-testing-model-managers-and-queryset-methods-brief-intro" tabindex="-1"><a class="anchor" href="#55-testing-model-managers-and-queryset-methods-brief-intro" name="55-testing-model-managers-and-queryset-methods-brief-intro" tabindex="-1"><span class="octicon octicon-link"></span></a>5.5 Testing Model Managers and QuerySet Methods (Brief Intro)</h2>
+<p>In Django, Model Managers (<code>YourModel.objects</code>) are the primary interface for database query operations. While Django provides a default manager, you'll often create custom managers or custom <code>QuerySet</code> classes to encapsulate frequently used queries or to add domain-specific methods for retrieving objects. These custom managers and QuerySet methods contain business logic, making them prime candidates for testing. Ensuring they behave as expected is crucial for the reliability of your application's data access layer.</p>
+<p><strong>The "Why": Why Test Custom Managers and QuerySets?</strong></p>
+<ol>
+<li><strong>Encapsulated Business Logic:</strong> Custom manager and QuerySet methods often contain specific filtering logic, ordering, or annotations that are central to your application's features. For example, a <code>Post.published_objects.get_todays_posts()</code> method clearly defines a business rule. Testing verifies this rule.</li>
+<li><strong>Database Interaction:</strong> These methods directly translate into database queries. Testing them ensures that the generated SQL (even if you don't see it directly) fetches the correct data under various conditions.</li>
+<li><strong>Refactoring Confidence:</strong> As your application evolves, you might need to refactor the underlying query logic. Well-written tests for your managers and QuerySets act as a safety net, ensuring that these changes don't inadvertently break existing functionality.</li>
+<li><strong>Clarity and Documentation:</strong> Tests for these methods serve as living documentation, clearly illustrating how they are intended to be used and what results they should produce.</li>
+</ol>
+<p>Let's explore how to test these components. We'll start with a custom model manager method.</p>
+<h3 id="551-testing-custom-model-manager-methods" tabindex="-1"><a class="anchor" href="#551-testing-custom-model-manager-methods" name="551-testing-custom-model-manager-methods" tabindex="-1"><span class="octicon octicon-link"></span></a>5.5.1 Testing Custom Model Manager Methods</h3>
+<p>A custom Model Manager can provide new methods to access your model's data. For instance, you might want a manager that only returns "published" articles or "active" users.</p>
+<p><strong>Scenario:</strong> Imagine we have a <code>BlogPost</code> model with a boolean field <code>is_published</code>. We want a custom manager, <code>PublishedPostManager</code>, that provides a method <code>get_published()</code> to fetch only published posts.</p>
+<p>First, let's define the model and the custom manager.</p>
+<p><strong><code>models.py</code>:</strong></p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+
+<span class="token keyword">class</span> <span class="token class-name">PublishedPostManager</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Manager<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">get_published</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Returns a QuerySet of all BlogPost instances
+        where is_published is True.
+        """</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>get_queryset<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token builtin">filter</span><span class="token punctuation">(</span>is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">class</span> <span class="token class-name">BlogPost</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    content <span class="token operator">=</span> models<span class="token punctuation">.</span>TextField<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    is_published <span class="token operator">=</span> models<span class="token punctuation">.</span>BooleanField<span class="token punctuation">(</span>default<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    published_date <span class="token operator">=</span> models<span class="token punctuation">.</span>DateTimeField<span class="token punctuation">(</span>blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    objects <span class="token operator">=</span> models<span class="token punctuation">.</span>Manager<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token comment"># The default manager.</span>
+    published_objects <span class="token operator">=</span> PublishedPostManager<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token comment"># Our custom manager.</span>
+
+    <span class="token keyword">def</span> <span class="token function">publish</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>is_published <span class="token operator">=</span> <span class="token boolean">True</span>
+        self<span class="token punctuation">.</span>published_date <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>save<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+</code></pre>
+<p>Let's examine this <code>models.py</code> code:</p>
+<ol>
+<li>
+<p><strong><code>PublishedPostManager(models.Manager)</code>:</strong></p>
+<ul>
+<li>We define a new class <code>PublishedPostManager</code> that inherits from <code>django.db.models.Manager</code>. This is the standard way to create a custom manager.</li>
+<li><strong><code>get_published(self)</code> method:</strong>
+<ul>
+<li>This is our custom method. Its purpose is to return only <code>BlogPost</code> instances that are marked as published.</li>
+<li><code>self.get_queryset()</code>: This method, inherited from <code>models.Manager</code>, returns the base <code>QuerySet</code> that the manager operates on (by default, all objects of the model).</li>
+<li><code>.filter(is_published=True)</code>: We then chain a standard QuerySet <code>filter()</code> method to narrow down the results to only those posts where the <code>is_published</code> field is <code>True</code>.</li>
+<li>The method returns this filtered <code>QuerySet</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code>BlogPost(models.Model)</code>:</strong></p>
+<ul>
+<li>This is a standard Django model with <code>title</code>, <code>content</code>, <code>is_published</code> (defaulting to <code>False</code>), and <code>published_date</code> fields.</li>
+<li><strong><code>objects = models.Manager()</code>:</strong> We explicitly assign the default Django manager to the <code>objects</code> attribute. This is good practice if you're adding custom managers, ensuring you still have easy access to the default manager's functionality (like <code>BlogPost.objects.all()</code>).</li>
+<li><strong><code>published_objects = PublishedPostManager()</code>:</strong> This is crucial. We instantiate our <code>PublishedPostManager</code> and assign it to an attribute on the <code>BlogPost</code> model, typically named descriptively (like <code>published_objects</code>). Now, we can use <code>BlogPost.published_objects.get_published()</code> to access our custom logic.</li>
+<li><strong><code>publish(self)</code> method:</strong> A helper method on the model instance to mark a post as published and set its publication date. We'll use this in our tests for convenience.</li>
+</ul>
+</li>
+</ol>
+<p>Now, let's write a test for the <code>get_published()</code> method of our <code>PublishedPostManager</code>.</p>
+<p><strong><code>tests/test_models.py</code>:</strong></p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">from</span> myapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> BlogPost  <span class="token comment"># Assuming your app is named 'myapp'</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_get_published_posts</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Create some test data</span>
+    published_post1 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Published Post 1"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content 1"</span><span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span>timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+    published_post2 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Published Post 2"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content 2"</span><span class="token punctuation">)</span>
+    <span class="token comment"># Use the model's publish method for this one</span>
+    published_post2<span class="token punctuation">.</span>publish<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    unpublished_post <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Unpublished Post"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content U"</span><span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    draft_post <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Draft Post"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content D"</span><span class="token punctuation">)</span> <span class="token comment"># is_published defaults to False</span>
+
+    <span class="token comment"># Act: Call the custom manager method</span>
+    retrieved_published_posts <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>published_objects<span class="token punctuation">.</span>get_published<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check the results</span>
+    <span class="token keyword">assert</span> retrieved_published_posts<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">2</span>
+    <span class="token keyword">assert</span> published_post1 <span class="token keyword">in</span> retrieved_published_posts
+    <span class="token keyword">assert</span> published_post2 <span class="token keyword">in</span> retrieved_published_posts
+    <span class="token keyword">assert</span> unpublished_post <span class="token keyword">not</span> <span class="token keyword">in</span> retrieved_published_posts
+    <span class="token keyword">assert</span> draft_post <span class="token keyword">not</span> <span class="token keyword">in</span> retrieved_published_posts
+
+    <span class="token keyword">for</span> post <span class="token keyword">in</span> retrieved_published_posts<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> post<span class="token punctuation">.</span>is_published <span class="token keyword">is</span> <span class="token boolean">True</span>
+</code></pre>
+<p>Let's break down this test:</p>
+<ol>
+<li>
+<p><strong><code>import pytest</code> and model import:</strong> Standard imports.</p>
+</li>
+<li>
+<p><strong><code>@pytest.mark.django_db</code>:</strong> This marker is essential. It ensures that the test runs within a transaction and has access to a test database, which will be rolled back after the test. This isolates our test data.</p>
+</li>
+<li>
+<p><strong><code>def test_get_published_posts():</code></strong>: A descriptive test function name.</p>
+</li>
+<li>
+<p><strong>Arrange:</strong> This is where we set up the conditions for our test.</p>
+<ul>
+<li><code>published_post1 = BlogPost.objects.create(...)</code>: We create a <code>BlogPost</code> instance that is explicitly set as published.</li>
+<li><code>published_post2 = BlogPost.objects.create(...)</code> followed by <code>published_post2.publish()</code>: We create another post and then use its <code>publish()</code> method. This demonstrates using model instance methods to prepare data, which can be cleaner.</li>
+<li><code>unpublished_post = BlogPost.objects.create(...)</code>: We create a post that is explicitly marked as <em>not</em> published.</li>
+<li><code>draft_post = BlogPost.objects.create(...)</code>: We create another post, relying on the <code>is_published</code> field's default value of <code>False</code>.</li>
+<li>The goal here is to create a mixed set of data: some that <em>should</em> be returned by our manager method, and some that <em>should not</em>. This allows us to test both positive and negative cases.</li>
+</ul>
+</li>
+<li>
+<p><strong>Act:</strong> This is where we execute the code we are testing.</p>
+<ul>
+<li><code>retrieved_published_posts = BlogPost.published_objects.get_published()</code>: We call our custom manager method. <code>BlogPost.published_objects</code> accesses our custom manager instance, and <code>.get_published()</code> calls the method we defined on it. The result, <code>retrieved_published_posts</code>, should be a <code>QuerySet</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Assert:</strong> This is where we verify that the outcome of the "Act" phase is what we expected.</p>
+<ul>
+<li><code>assert retrieved_published_posts.count() == 2</code>: We assert that the QuerySet returned by <code>get_published()</code> contains exactly two posts. This is a primary check.</li>
+<li><code>assert published_post1 in retrieved_published_posts</code>: We check if the specific published post we created is present in the results. This confirms that <em>correct</em> items are included.</li>
+<li><code>assert published_post2 in retrieved_published_posts</code>: Same check for the second published post.</li>
+<li><code>assert unpublished_post not in retrieved_published_posts</code>: Crucially, we also check that posts which <em>should not</em> be included are indeed absent. This tests the filtering logic's exclusivity.</li>
+<li><code>assert draft_post not in retrieved_published_posts</code>: Same for the other unpublished post.</li>
+<li><code>for post in retrieved_published_posts: assert post.is_published is True</code>: As an additional safeguard, we iterate through the results and confirm that every post in the <code>retrieved_published_posts</code> QuerySet actually has its <code>is_published</code> attribute set to <code>True</code>. This directly verifies the core condition of our manager method.</li>
+</ul>
+</li>
+</ol>
+<p>This test methodically creates a scenario, invokes the manager method, and then rigorously checks if the output matches the expected set of published posts, thereby validating the logic within <code>PublishedPostManager.get_published()</code>.</p>
+<h3 id="552-testing-custom-queryset-methods" tabindex="-1"><a class="anchor" href="#552-testing-custom-queryset-methods" name="552-testing-custom-queryset-methods" tabindex="-1"><span class="octicon octicon-link"></span></a>5.5.2 Testing Custom QuerySet Methods</h3>
+<p>Sometimes, you want to add custom filtering or utility methods directly to <code>QuerySet</code> objects themselves. This allows for chainable, readable query construction. For example, after getting all posts, you might want to filter them by a specific author: <code>BlogPost.objects.all().by_author(some_author)</code>.</p>
+<p>To do this, you first define a custom <code>QuerySet</code> class, then tell your model manager to use it.</p>
+<p><strong>Scenario:</strong> Let's extend our <code>BlogPost</code> model. We'll add an <code>author</code> field (a <code>ForeignKey</code> to Django's <code>User</code> model) and then create a custom <code>PostQuerySet</code> with a method <code>by_author(user)</code> to filter posts by a given author. We'll also modify our <code>PublishedPostManager</code> to use this custom <code>PostQuerySet</code>.</p>
+<p><strong>Updated <code>models.py</code>:</strong></p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>contrib<span class="token punctuation">.</span>auth<span class="token punctuation">.</span>models <span class="token keyword">import</span> User
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+
+<span class="token keyword">class</span> <span class="token class-name">PostQuerySet</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>QuerySet<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">by_author</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> author_user<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Filters the QuerySet to include only posts by the given author.
+        """</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span><span class="token builtin">filter</span><span class="token punctuation">(</span>author<span class="token operator">=</span>author_user<span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">published</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Filters the QuerySet to include only published posts.
+        (Moved from manager for chainability)
+        """</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span><span class="token builtin">filter</span><span class="token punctuation">(</span>is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+<span class="token keyword">class</span> <span class="token class-name">PublishedPostManager</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Manager<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">get_queryset</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Instructs this manager to use PostQuerySet</span>
+        <span class="token keyword">return</span> PostQuerySet<span class="token punctuation">(</span>self<span class="token punctuation">.</span>model<span class="token punctuation">,</span> using<span class="token operator">=</span>self<span class="token punctuation">.</span>_db<span class="token punctuation">)</span><span class="token punctuation">.</span>published<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># We can keep get_published if we want the old API,</span>
+    <span class="token comment"># or remove it if we prefer chaining like .published_objects.all().published()</span>
+    <span class="token comment"># For this example, let's assume we want to use the QuerySet method directly.</span>
+    <span class="token comment"># So, PublishedPostManager will now directly return published posts by default.</span>
+
+<span class="token keyword">class</span> <span class="token class-name">BlogPost</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    content <span class="token operator">=</span> models<span class="token punctuation">.</span>TextField<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    author <span class="token operator">=</span> models<span class="token punctuation">.</span>ForeignKey<span class="token punctuation">(</span>User<span class="token punctuation">,</span> on_delete<span class="token operator">=</span>models<span class="token punctuation">.</span>CASCADE<span class="token punctuation">,</span> related_name<span class="token operator">=</span><span class="token string">"blog_posts"</span><span class="token punctuation">)</span>
+    is_published <span class="token operator">=</span> models<span class="token punctuation">.</span>BooleanField<span class="token punctuation">(</span>default<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    published_date <span class="token operator">=</span> models<span class="token punctuation">.</span>DateTimeField<span class="token punctuation">(</span>blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    objects <span class="token operator">=</span> PostQuerySet<span class="token punctuation">.</span>as_manager<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token comment"># Use PostQuerySet for the default manager too!</span>
+    <span class="token comment"># Or, if you want 'objects' to be a plain manager and 'published_objects' to use the custom QuerySet:</span>
+    <span class="token comment"># objects = models.Manager()</span>
+    <span class="token comment"># published_objects = PublishedPostManager.from_queryset(PostQuerySet)() # More explicit</span>
+    
+    <span class="token comment"># Let's simplify for this example:</span>
+    <span class="token comment"># We'll have 'objects' use PostQuerySet, and 'published_objects' will be a specialized manager</span>
+    <span class="token comment"># that *starts* with published posts from PostQuerySet.</span>
+    published_objects <span class="token operator">=</span> PublishedPostManager<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+
+    <span class="token keyword">def</span> <span class="token function">publish</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>is_published <span class="token operator">=</span> <span class="token boolean">True</span>
+        self<span class="token punctuation">.</span>published_date <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>save<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+
+</code></pre>
+<p>Let's dissect the changes in <code>models.py</code>:</p>
+<ol>
+<li>
+<p><strong><code>from django.contrib.auth.models import User</code></strong>: We import the <code>User</code> model to use as the author.</p>
+</li>
+<li>
+<p><strong><code>class PostQuerySet(models.QuerySet):</code></strong>:</p>
+<ul>
+<li>We define <code>PostQuerySet</code> inheriting from <code>django.db.models.QuerySet</code>.</li>
+<li><strong><code>by_author(self, author_user)</code> method:</strong>
+<ul>
+<li>This is our custom QuerySet method. It takes an <code>author_user</code> (an instance of <code>User</code>) as an argument.</li>
+<li><code>return self.filter(author=author_user)</code>: It filters the current QuerySet (represented by <code>self</code>) to include only posts where the <code>author</code> field matches the provided <code>author_user</code>.</li>
+</ul>
+</li>
+<li><strong><code>published(self)</code> method:</strong>
+<ul>
+<li>We've moved the logic for filtering published posts here from the manager. This makes it chainable, e.g., <code>BlogPost.objects.by_author(user1).published()</code>.</li>
+<li><code>return self.filter(is_published=True)</code>: Filters for published posts.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code>class PublishedPostManager(models.Manager):</code></strong>:</p>
+<ul>
+<li><strong><code>get_queryset(self)</code> method:</strong>
+<ul>
+<li>This method is overridden to tell Django that any QuerySet returned by this manager should be an instance of <code>PostQuerySet</code>.</li>
+<li><code>return PostQuerySet(self.model, using=self._db).published()</code>: This is key. It creates an instance of <code>PostQuerySet</code> for the <code>BlogPost</code> model and immediately calls the <code>.published()</code> method on it. So, <code>BlogPost.published_objects.all()</code> will now directly give you published posts, and you can chain other <code>PostQuerySet</code> methods like <code>by_author()</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code>BlogPost</code> model changes:</strong></p>
+<ul>
+<li><code>author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="blog_posts")</code>: We add the <code>author</code> field.</li>
+<li><strong><code>objects = PostQuerySet.as_manager()</code></strong>: This is a common pattern. It tells Django that the default <code>objects</code> manager should use <code>PostQuerySet</code>. So, <code>BlogPost.objects.all()</code> will return a <code>PostQuerySet</code>, allowing you to do <code>BlogPost.objects.all().by_author(user1)</code>.</li>
+<li><strong><code>published_objects = PublishedPostManager()</code></strong>: Our custom manager is still in place. Because its <code>get_queryset()</code> method now returns a <code>PostQuerySet</code> that is already filtered by <code>published()</code>, <code>BlogPost.published_objects.all()</code> will give published posts, and you can chain <code>by_author()</code> like so: <code>BlogPost.published_objects.all().by_author(user1)</code>.</li>
+</ul>
+</li>
+</ol>
+<p>Now, let's write tests for our new <code>PostQuerySet.by_author()</code> method and how it interacts.</p>
+<p><strong>Updated <code>tests/test_models.py</code>:</strong></p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>contrib<span class="token punctuation">.</span>auth<span class="token punctuation">.</span>models <span class="token keyword">import</span> User
+<span class="token keyword">from</span> myapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> BlogPost <span class="token comment"># Assuming your app is named 'myapp'</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>fixture</span>
+<span class="token keyword">def</span> <span class="token function">author1</span><span class="token punctuation">(</span>db<span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token comment"># db fixture ensures database access</span>
+    <span class="token keyword">return</span> User<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create_user<span class="token punctuation">(</span>username<span class="token operator">=</span><span class="token string">"author1"</span><span class="token punctuation">,</span> password<span class="token operator">=</span><span class="token string">"password123"</span><span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>fixture</span>
+<span class="token keyword">def</span> <span class="token function">author2</span><span class="token punctuation">(</span>db<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span> User<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create_user<span class="token punctuation">(</span>username<span class="token operator">=</span><span class="token string">"author2"</span><span class="token punctuation">,</span> password<span class="token operator">=</span><span class="token string">"password123"</span><span class="token punctuation">)</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_queryset_by_author</span><span class="token punctuation">(</span>author1<span class="token punctuation">,</span> author2<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Create posts by different authors</span>
+    post_a1_1 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Author 1 Post 1"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content A1-1"</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author1<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    post_a1_2 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Author 1 Post 2"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content A1-2"</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author1<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span> <span class="token comment"># Unpublished</span>
+    post_a2_1 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Author 2 Post 1"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"Content A2-1"</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author2<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Act: Use the custom QuerySet method via the default manager</span>
+    author1_posts <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>by_author<span class="token punctuation">(</span>author1<span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> author1_posts<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">2</span>
+    <span class="token keyword">assert</span> post_a1_1 <span class="token keyword">in</span> author1_posts
+    <span class="token keyword">assert</span> post_a1_2 <span class="token keyword">in</span> author1_posts <span class="token comment"># by_author doesn't care about published status by itself</span>
+    <span class="token keyword">assert</span> post_a2_1 <span class="token keyword">not</span> <span class="token keyword">in</span> author1_posts
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_queryset_published_method</span><span class="token punctuation">(</span>author1<span class="token punctuation">,</span> author2<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange</span>
+    pub_post_a1 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Published A1"</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author1<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    unpub_post_a1 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Unpublished A1"</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author1<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    pub_post_a2 <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Published A2"</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author2<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Act: Use the .published() QuerySet method</span>
+    published_posts <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>published<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> published_posts<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">2</span>
+    <span class="token keyword">assert</span> pub_post_a1 <span class="token keyword">in</span> published_posts
+    <span class="token keyword">assert</span> pub_post_a2 <span class="token keyword">in</span> published_posts
+    <span class="token keyword">assert</span> unpub_post_a1 <span class="token keyword">not</span> <span class="token keyword">in</span> published_posts
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_chaining_queryset_methods</span><span class="token punctuation">(</span>author1<span class="token punctuation">,</span> author2<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange</span>
+    post_a1_pub <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"A1 Published"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"..."</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author1<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    post_a1_unpub <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"A1 Unpublished"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"..."</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author1<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+    post_a2_pub <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"A2 Published"</span><span class="token punctuation">,</span> content<span class="token operator">=</span><span class="token string">"..."</span><span class="token punctuation">,</span> author<span class="token operator">=</span>author2<span class="token punctuation">,</span> is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Act: Chain custom QuerySet methods</span>
+    <span class="token comment"># Option 1: Start with all objects, then filter</span>
+    author1_published_posts <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>objects<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>by_author<span class="token punctuation">(</span>author1<span class="token punctuation">)</span><span class="token punctuation">.</span>published<span class="token punctuation">(</span><span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert for Option 1</span>
+    <span class="token keyword">assert</span> author1_published_posts<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1</span>
+    <span class="token keyword">assert</span> post_a1_pub <span class="token keyword">in</span> author1_published_posts
+    <span class="token keyword">assert</span> post_a1_unpub <span class="token keyword">not</span> <span class="token keyword">in</span> author1_published_posts
+    <span class="token keyword">assert</span> post_a2_pub <span class="token keyword">not</span> <span class="token keyword">in</span> author1_published_posts
+
+    <span class="token comment"># Act: Option 2: Start with published_objects manager, then filter by author</span>
+    <span class="token comment"># (Remember, published_objects manager's get_queryset already calls .published())</span>
+    author1_published_posts_via_manager <span class="token operator">=</span> BlogPost<span class="token punctuation">.</span>published_objects<span class="token punctuation">.</span><span class="token builtin">all</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span>by_author<span class="token punctuation">(</span>author1<span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert for Option 2</span>
+    <span class="token keyword">assert</span> author1_published_posts_via_manager<span class="token punctuation">.</span>count<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">1</span>
+    <span class="token keyword">assert</span> post_a1_pub <span class="token keyword">in</span> author1_published_posts_via_manager
+    <span class="token keyword">assert</span> post_a1_unpub <span class="token keyword">not</span> <span class="token keyword">in</span> author1_published_posts_via_manager <span class="token comment"># Should be filtered by manager</span>
+    <span class="token keyword">assert</span> post_a2_pub <span class="token keyword">not</span> <span class="token keyword">in</span> author1_published_posts_via_manager <span class="token comment"># Should be filtered by by_author</span>
+
+</code></pre>
+<p>Let's analyze these new tests:</p>
+<ol>
+<li>
+<p><strong><code>author1</code> and <code>author2</code> fixtures:</strong></p>
+<ul>
+<li>We define Pytest fixtures to create <code>User</code> instances. This is a good practice for reusable setup data. The <code>db</code> fixture (implicitly requested by <code>@pytest.mark.django_db</code> on the test function, or explicitly here for clarity) ensures database access is available when the fixture runs.</li>
+<li>These fixtures provide clean <code>User</code> objects for our tests, making the test functions themselves more focused on the logic being tested.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>test_queryset_by_author(author1, author2)</code>:</strong></p>
+<ul>
+<li><strong>Arrange:</strong> We create three posts: two by <code>author1</code> (one published, one not) and one by <code>author2</code> (published).</li>
+<li><strong>Act:</strong> <code>author1_posts = BlogPost.objects.all().by_author(author1)</code>
+<ul>
+<li>We start with <code>BlogPost.objects.all()</code>, which returns our <code>PostQuerySet</code> (because we set <code>objects = PostQuerySet.as_manager()</code>).</li>
+<li>Then we chain <code>.by_author(author1)</code>, calling our custom QuerySet method.</li>
+</ul>
+</li>
+<li><strong>Assert:</strong>
+<ul>
+<li><code>assert author1_posts.count() == 2</code>: We expect two posts from <code>author1</code>.</li>
+<li>We check that both <code>post_a1_1</code> and <code>post_a1_2</code> are in the results. This is important: <code>by_author</code> <em>only</em> filters by author; it doesn't care about the <code>is_published</code> status on its own.</li>
+<li><code>assert post_a2_1 not in author1_posts</code>: Ensure <code>author2</code>'s post is excluded.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code>test_queryset_published_method(author1, author2)</code>:</strong></p>
+<ul>
+<li>This test specifically validates the <code>published()</code> method on our <code>PostQuerySet</code>.</li>
+<li><strong>Arrange:</strong> Create a mix of published and unpublished posts by different authors.</li>
+<li><strong>Act:</strong> <code>published_posts = BlogPost.objects.all().published()</code></li>
+<li><strong>Assert:</strong> Verify that only published posts are returned, regardless of author.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>test_chaining_queryset_methods(author1, author2)</code>:</strong></p>
+<ul>
+<li>This test demonstrates the power of chainable QuerySet methods and how they interact with custom managers.</li>
+<li><strong>Arrange:</strong> A mix of posts: published by author1, unpublished by author1, published by author2.</li>
+<li><strong>Act (Option 1):</strong> <code>author1_published_posts = BlogPost.objects.all().by_author(author1).published()</code>
+<ul>
+<li>Here, we start with all objects, filter by <code>author1</code>, and then filter those results for published posts.</li>
+</ul>
+</li>
+<li><strong>Assert (Option 1):</strong> We expect only one post (<code>post_a1_pub</code>).</li>
+<li><strong>Act (Option 2):</strong> <code>author1_published_posts_via_manager = BlogPost.published_objects.all().by_author(author1)</code>
+<ul>
+<li>Here, <code>BlogPost.published_objects.all()</code> already gives us a <code>PostQuerySet</code> containing only published posts (due to our <code>PublishedPostManager.get_queryset()</code> implementation).</li>
+<li>We then chain <code>.by_author(author1)</code> to further filter these published posts by <code>author1</code>.</li>
+</ul>
+</li>
+<li><strong>Assert (Option 2):</strong> The result should be the same: only <code>post_a1_pub</code>. This test verifies that both approaches to achieving the same filtered dataset work as expected, showcasing the flexibility of the design.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Key Considerations When Testing Managers and QuerySets:</strong></p>
+<ul>
+<li><strong>Isolate Logic:</strong> Aim to test the specific logic of the manager or QuerySet method. If a method combines multiple criteria, ensure your test data covers various combinations of these criteria.</li>
+<li><strong>Boundary Conditions:</strong> Test with no matching objects, one matching object, and multiple matching objects.</li>
+<li><strong>Data Integrity:</strong> Ensure the objects returned are the correct instances and have the expected attribute values if your methods modify or annotate them (though our examples here are purely for filtering).</li>
+<li><strong>Chaining:</strong> If your QuerySet methods are designed to be chained, test various valid chain combinations.</li>
+</ul>
+<p>This brief introduction covers the common scenario of testing custom manager and QuerySet methods that filter data. The fundamental approach remains the same for more complex methods: set up the necessary data, execute the method, and assert that the returned QuerySet (or other result) is correct. By testing these components, you build a more robust and reliable data access layer in your Django applications.</p>
+</div></div><script>
+document.addEventListener('DOMContentLoaded', function() {
+  const preTags = document.querySelectorAll('pre');
+  
+  preTags.forEach(function(pre) {
+    const existingContainer = pre.closest('.pre-container');
+    if (existingContainer) {
+      // If pre is already in a container (e.g. script ran multiple times or manual structure)
+      // Ensure button is there or add it. For simplicity, we assume if container exists, button might too.
+      // A more robust check would be to see if a .copy-btn already exists for this pre.
+      // For now, let's prevent adding duplicate buttons if script re-runs on dynamic content.
+      if (existingContainer.querySelector('.copy-btn')) {
+          return; // Skip if button already there
+      }
+    }
+
+    const container = document.createElement('div');
+    container.className = 'pre-container';
+    
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'Copy';
+    copyBtn.className = 'copy-btn';
+    
+    copyBtn.addEventListener('click', function() {
+      const textToCopy = pre.innerText || pre.textContent; // .innerText is often better for user-visible text
+      navigator.clipboard.writeText(textToCopy).then(
+        function() {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          copyBtn.classList.remove('failed');
+          
+          setTimeout(function() {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        },
+        function() {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Failed!';
+          copyBtn.classList.add('failed');
+          copyBtn.classList.remove('copied');
+          
+          setTimeout(function() {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('failed');
+          }, 2000);
+        }
+      );
+    });
+    
+    // Structure: parent -> container -> pre & button
+    if (pre.parentNode) {
+        pre.parentNode.insertBefore(container, pre);
+    }
+    container.appendChild(pre); // Move pre into container
+    container.appendChild(copyBtn); // Add button to container
+  });
+});
+</script></body></html>

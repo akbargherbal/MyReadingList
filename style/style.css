@@ -1,0 +1,142 @@
+:root {
+  /* Base scale factor - adjust this single value to scale everything */
+  font-size: 30px; /* Increase this to scale up everything */
+}
+
+#_html {
+  width: 100%;
+  max-width: 100%;
+}
+
+.akbar_container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 100px;
+  /* Use relative units for all font sizes */
+  font-size: 1rem; /* This will inherit from the root element */
+}
+
+/* All elements will now scale proportionally based on the root font size */
+h1 {
+  font-size: 2rem;
+}
+h2 {
+  font-size: 1.75rem;
+}
+h3 {
+  font-size: 1.5rem;
+}
+h4 {
+  font-size: 1.25rem;
+}
+.akbar_container h5 {
+  font-size: 1rem !important;
+  font-weight: bold !important; 
+  background-color: goldenrod;
+  margin-bottom: 0.5rem;
+}
+pre,
+code {
+  font-size: 0.8rem !important; 
+}
+
+.akbar_container p {
+    margin-top: 0.5 rem;
+}
+
+:root {
+    /* Base scale factor - adjust this single value to scale everything */
+    font-size: 30px; /* Increase this to scale up everything */
+  }
+  
+  #_html {
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .akbar_container {
+    width: 90%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 100px;
+    /* Use relative units for all font sizes */
+    font-size: 1rem; /* This will inherit from the root element */
+  }
+  
+  /* All elements will now scale proportionally based on the root font size */
+  h1 {
+    font-size: 2rem;
+  }
+  h2 {
+    font-size: 1.75rem;
+  }
+  h3 {
+    font-size: 1.5rem;
+  }
+  h4 {
+    font-size: 1.25rem;
+  }
+  .akbar_container h5 {
+    font-size: 1rem;
+    font-weight: bold;
+    color: blue;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-left: 4px;
+    
+
+  }
+  pre,
+  code {
+    font-size: 0.9rem;
+  }
+  
+  /* Simple table color fixes for dark mode with higher specificity */
+  .akbar_container table {
+    border-collapse: collapse;
+    margin: 1rem 0;
+    color: #e0e0e0; /* Light gray text for all table content */
+  }
+  
+  .akbar_container table th {
+    background-color: #333;
+    border: 1px solid #555;
+    padding: 0.4rem;
+    color: #ffffff; /* White text for headers */
+    font-weight: bold;
+  }
+  
+  .akbar_container table td {
+    border: 1px solid #555;
+    padding: 0.4rem;
+    background-color: #1a1a1a; /* Dark background for all cells */
+  }
+  
+  /* Slightly lighter background for better visibility */
+  .akbar_container table tr:nth-child(even) td {
+    background-color: #252525; /* Slightly lighter for even rows */
+  }
+  
+  /* Ensure links in tables remain visible */
+  .akbar_container table a {
+    color: #4dabf7; /* Light blue for links */
+  }
+  
+  /* Override any other styling that might be applied */
+  .akbar_container table, 
+  .akbar_container table tr, 
+  .akbar_container table th, 
+  .akbar_container table td {
+    font-size: inherit; /* Inherit font size from container */
+  }
+
+
+  h5 code {
+    background-color: aquamarine;
+    border-radius: 4px;
+  }
+
+  /* .akbar_container p {
+    font-family:Tahoma, Poppins, Verdana;
+  } */

@@ -1,0 +1,1735 @@
+<html><head><meta content="light dark" name="color-scheme"/><link href="../style/icons/default/16x16.png" rel="icon"/><link href="../style/themes/github-dark.css" id="_theme" rel="stylesheet" type="text/css"/><link href="../style/vendor/prism-okaidia.min.css" id="_prism" rel="stylesheet" type="text/css"/><link defer="" href="../style/style.css" rel="stylesheet"/><style>
+.pre-container {
+    position: relative;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    background-color: #800000; /* Maroon */
+    color: white;
+    border: 1px solid #5c0000; /* Darker maroon */
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.copy-btn:hover {
+    background-color: #a00000; /* Lighter maroon on hover */
+}
+
+.copy-btn.copied {
+    background-color: #006400; /* Dark Green */
+    border-color: #004d00;
+    color: white;
+}
+
+.copy-btn.failed {
+    background-color: #dc3545; /* Red */
+    border-color: #c82333;
+    color: white;
+}
+</style></head><body class="_theme-github _color-light"><div class="markdown-body" id="_html" style="visibility: visible;"><div class="akbar_container"><h1 id="chapter-19-running-tests-like-a-pro" tabindex="-1"><a class="anchor" href="#chapter-19-running-tests-like-a-pro" name="chapter-19-running-tests-like-a-pro" tabindex="-1"><span class="octicon octicon-link"></span></a>Chapter 19: Running Tests Like a Pro</h1>
+<h2 id="191-running-specific-files-classes-or-functions" tabindex="-1"><a class="anchor" href="#191-running-specific-files-classes-or-functions" name="191-running-specific-files-classes-or-functions" tabindex="-1"><span class="octicon octicon-link"></span></a>19.1 Running Specific Files, Classes, or Functions</h2>
+<p>As your Django project grows, so will your test suite. Running every single test after every minor change can become time-consuming and slow down your development feedback loop. Imagine you're working on a specific model's logic; you likely don't need to run all your end-to-end Playwright tests just to verify a small change in a model method. This is where <code>pytest</code>'s ability to run specific tests shines. It allows you to target your execution precisely, giving you faster feedback and making debugging more efficient.</p>
+<p>This capability is fundamental to an efficient testing workflow. It empowers you to:</p>
+<ul>
+<li><strong>Iterate quickly:</strong> When developing a new feature or fixing a bug, you can run only the relevant tests, getting results in seconds rather than minutes.</li>
+<li><strong>Debug effectively:</strong> If a specific test fails in a large run, you can isolate it and run it repeatedly while you diagnose the issue, without the noise of other tests.</li>
+<li><strong>Focus your attention:</strong> By running a subset of tests, you concentrate on the part of the system you're currently working on.</li>
+</ul>
+<p>Let's explore how <code>pytest</code> enables this granular control.</p>
+<h3 id="running-tests-in-a-specific-file" tabindex="-1"><a class="anchor" href="#running-tests-in-a-specific-file" name="running-tests-in-a-specific-file" tabindex="-1"><span class="octicon octicon-link"></span></a>Running Tests in a Specific File</h3>
+<p>The most straightforward way to narrow down your test execution is to tell <code>pytest</code> to run tests only from a particular file.</p>
+<p><strong>The Mechanism:</strong>
+You achieve this by providing the path to the test file as an argument to the <code>pytest</code> command.</p>
+<p><strong>Example Scenario:</strong>
+Suppose your project has the following structure for its tests within an app named <code>products</code>:</p>
+<pre><code>my_django_project/
+├── manage.py
+├── products/
+│   ├── tests/
+│   │   ├── __init__.py
+│   │   ├── test_models.py  # Contains tests for product models
+│   │   ├── test_views.py   # Contains tests for product views
+│   │   └── test_forms.py   # Contains tests for product forms
+│   └── ...
+└── ...
+</code></pre>
+<p>If you've just made changes to your product models and only want to run the tests in <code>test_models.py</code>, you would use the following command:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest products/tests/test_models.py
+</code></pre>
+<p><strong>Explanation of the Command:</strong></p>
+<p>Let's break down this command:</p>
+<ol>
+<li>
+<p><strong><code>pytest</code></strong>: This is the command-line invocation for the <code>pytest</code> test runner. It tells your system to execute <code>pytest</code>.</p>
+</li>
+<li>
+<p><strong><code>products/tests/test_models.py</code></strong>: This is an argument passed to <code>pytest</code>. It's the relative path from your project's root directory (where you typically run <code>pytest</code>) to the specific test file you want to execute.</p>
+<ul>
+<li><strong>Purpose</strong>: By providing this path, you instruct <code>pytest</code> to restrict its test discovery and execution to only this file.</li>
+<li><strong>Behavior</strong>: <code>pytest</code> will look inside <code>products/tests/test_models.py</code> for any functions prefixed with <code>test_</code> or any classes prefixed with <code>Test</code> that contain methods prefixed with <code>test_</code>. It will then execute all such discovered tests. Tests in <code>test_views.py</code> or <code>test_forms.py</code> will be ignored for this run.</li>
+<li><strong>Why this approach?</strong>: This is highly efficient when you're confident that your changes are localized to the logic tested within that specific file. For instance, if you're refactoring a custom method on a <code>Product</code> model, running only <code>test_models.py</code> gives you quick confirmation that your model-level logic is still sound.</li>
+</ul>
+</li>
+</ol>
+<p>This targeted execution significantly speeds up the feedback cycle compared to running the entire test suite.</p>
+<h3 id="running-tests-in-a-specific-class" tabindex="-1"><a class="anchor" href="#running-tests-in-a-specific-class" name="running-tests-in-a-specific-class" tabindex="-1"><span class="octicon octicon-link"></span></a>Running Tests in a Specific Class</h3>
+<p>Sometimes, even a single test file can contain numerous tests, perhaps organized into different classes, each focusing on a particular aspect or component. <code>pytest</code> allows you to be even more specific and run all tests within a particular class in a given file.</p>
+<p><strong>The Mechanism:</strong>
+You specify the file path, followed by <code>::</code> (two colons), and then the name of the test class. The <code>::</code> acts as a separator, helping <code>pytest</code> navigate to the specific "node" (in this case, a class) within the file.</p>
+<p><strong>Example Scenario:</strong>
+Let's assume your <code>products/tests/test_views.py</code> file looks like this:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># products/tests/test_views.py</span>
+
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>urls <span class="token keyword">import</span> reverse
+<span class="token comment"># Assume you have User model and Product model defined elsewhere</span>
+<span class="token comment"># from django.contrib.auth.models import User</span>
+<span class="token comment"># from ..models import Product</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">class</span> <span class="token class-name">TestProductListView</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">test_product_list_page_renders_for_anonymous_user</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># response = client.get(reverse('product_list'))</span>
+        <span class="token comment"># assert response.status_code == 200</span>
+        <span class="token comment"># assert b"Our Products" in response.content</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span> <span class="token comment"># Placeholder for brevity</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_product_list_shows_all_products</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># Product.objects.create(name="Laptop", price=1200)</span>
+        <span class="token comment"># Product.objects.create(name="Mouse", price=25)</span>
+        <span class="token comment"># response = client.get(reverse('product_list'))</span>
+        <span class="token comment"># assertContains(response, "Laptop")</span>
+        <span class="token comment"># assertContains(response, "Mouse")</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span> <span class="token comment"># Placeholder for brevity</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">class</span> <span class="token class-name">TestProductDetailView</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">test_product_detail_page_renders</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># product = Product.objects.create(name="Keyboard", price=75)</span>
+        <span class="token comment"># response = client.get(reverse('product_detail', args=[product.pk]))</span>
+        <span class="token comment"># assert response.status_code == 200</span>
+        <span class="token comment"># assertContains(response, "Keyboard")</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span> <span class="token comment"># Placeholder for brevity</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_product_detail_404_for_invalid_product</span><span class="token punctuation">(</span>self<span class="token punctuation">,</span> client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token comment"># response = client.get(reverse('product_detail', args=[999]))</span>
+        <span class="token comment"># assert response.status_code == 404</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span> <span class="token comment"># Placeholder for brevity</span>
+</code></pre>
+<p>If you are working specifically on the product list page functionality and only want to run tests within the <code>TestProductListView</code> class, you would use this command:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest products/tests/test_views.py::TestProductListView
+</code></pre>
+<p><strong>Explanation of the Command:</strong></p>
+<p>Let's dissect this command:</p>
+<ol>
+<li>
+<p><strong><code>pytest</code></strong>: The test runner.</p>
+</li>
+<li>
+<p><strong><code>products/tests/test_views.py</code></strong>: The path to the test file.</p>
+</li>
+<li>
+<p><strong><code>::</code></strong>: This is <code>pytest</code>'s node ID separator. It tells <code>pytest</code> to look <em>inside</em> the preceding item (the file) for the next item.</p>
+</li>
+<li>
+<p><strong><code>TestProductListView</code></strong>: The name of the class containing the tests you want to run.</p>
+<ul>
+<li><strong>Purpose</strong>: This command instructs <code>pytest</code> to first locate the specified file, then find the class named <code>TestProductListView</code> within that file.</li>
+<li><strong>Behavior</strong>: <code>pytest</code> will execute all methods within <code>TestProductListView</code> that conform to test naming conventions (i.e., methods starting with <code>test_</code>). In our example, <code>test_product_list_page_renders_for_anonymous_user</code> and <code>test_product_list_shows_all_products</code> would run, but tests within <code>TestProductDetailView</code> would be skipped.</li>
+<li><strong>Why this approach?</strong>: When a feature (like the product list page) has multiple test cases grouped into a class, this allows you to focus your testing on just that feature set. It's more granular than running the whole file and is particularly useful when a file contains tests for several distinct features or components.</li>
+</ul>
+</li>
+</ol>
+<p>This level of specificity is a step further in refining your test runs for faster, more focused feedback.</p>
+<h3 id="running-a-specific-test-function-or-method" tabindex="-1"><a class="anchor" href="#running-a-specific-test-function-or-method" name="running-a-specific-test-function-or-method" tabindex="-1"><span class="octicon octicon-link"></span></a>Running a Specific Test Function or Method</h3>
+<p>For the ultimate level of precision, <code>pytest</code> allows you to target a single test function or a single test method within a class. This is invaluable when debugging a particular failing test or iteratively developing a single test case.</p>
+<p><strong>The Mechanism:</strong>
+You extend the <code>::</code> notation.</p>
+<ul>
+<li>For a standalone test function (not inside a class): <code>pytest path/to/file.py::test_function_name</code></li>
+<li>For a test method inside a class: <code>pytest path/to/file.py::ClassName::test_method_name</code></li>
+</ul>
+<p><strong>Example 1: Standalone Test Function</strong></p>
+<p>Suppose you have a utility functions test file, <code>common/tests/test_utils.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># common/tests/test_utils.py</span>
+
+<span class="token keyword">def</span> <span class="token function">test_format_user_display_name</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># result = format_user_display_name("john", "doe")</span>
+    <span class="token comment"># assert result == "Doe, John"</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span> <span class="token comment"># Placeholder</span>
+
+<span class="token keyword">def</span> <span class="token function">test_calculate_sales_tax</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># tax = calculate_sales_tax(100, 0.05)</span>
+    <span class="token comment"># assert tax == 5.0</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span> <span class="token comment"># Placeholder</span>
+</code></pre>
+<p>To run only the <code>test_calculate_sales_tax</code> function:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest common/tests/test_utils.py::test_calculate_sales_tax
+</code></pre>
+<p><strong>Explanation of the Command (Example 1):</strong></p>
+<ol>
+<li>
+<p><strong><code>pytest</code></strong>: The test runner.</p>
+</li>
+<li>
+<p><strong><code>common/tests/test_utils.py</code></strong>: The path to the test file.</p>
+</li>
+<li>
+<p><strong><code>::</code></strong>: The node ID separator.</p>
+</li>
+<li>
+<p><strong><code>test_calculate_sales_tax</code></strong>: The name of the specific test function to run.</p>
+<ul>
+<li><strong>Purpose</strong>: This command tells <code>pytest</code> to execute <em>only</em> the <code>test_calculate_sales_tax</code> function within the <code>common/tests/test_utils.py</code> file.</li>
+<li><strong>Behavior</strong>: <code>pytest</code> will ignore <code>test_format_user_display_name</code> and any other tests in the file or project.</li>
+<li><strong>Why this approach?</strong>: This is extremely useful when a single test is failing, and you want to run it repeatedly while you debug the code it tests. It's also helpful when writing a new test; you can run just that one test to ensure it passes before moving on.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Example 2: Test Method within a Class</strong></p>
+<p>Let's revisit our <code>products/tests/test_views.py</code> example. To run only the <code>test_product_detail_404_for_invalid_product</code> method within the <code>TestProductDetailView</code> class:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># products/tests/test_views.py (content as shown previously)</span>
+<span class="token comment"># ...</span>
+<span class="token comment"># @pytest.mark.django_db</span>
+<span class="token comment"># class TestProductDetailView:</span>
+<span class="token comment">#     def test_product_detail_page_renders(self, client):</span>
+<span class="token comment">#         assert True # Placeholder</span>
+<span class="token comment">#</span>
+<span class="token comment">#     def test_product_detail_404_for_invalid_product(self, client):</span>
+<span class="token comment">#         assert True # Placeholder</span>
+<span class="token comment"># ...</span>
+</code></pre>
+<p>Command:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest products/tests/test_views.py::TestProductDetailView::test_product_detail_404_for_invalid_product
+</code></pre>
+<p><strong>Explanation of the Command (Example 2):</strong></p>
+<ol>
+<li>
+<p><strong><code>pytest</code></strong>: The test runner.</p>
+</li>
+<li>
+<p><strong><code>products/tests/test_views.py</code></strong>: The path to the test file.</p>
+</li>
+<li>
+<p><strong><code>::TestProductDetailView</code></strong>: Specifies the class <code>TestProductDetailView</code> within the file.</p>
+</li>
+<li>
+<p><strong><code>::test_product_detail_404_for_invalid_product</code></strong>: Specifies the method <code>test_product_detail_404_for_invalid_product</code> within the <code>TestProductDetailView</code> class.</p>
+<ul>
+<li><strong>Purpose</strong>: This command provides a fully qualified path to a single test method.</li>
+<li><strong>Behavior</strong>: <code>pytest</code> will navigate through the file, into the class, and execute only this specific test method. All other tests, even those within <code>TestProductDetailView</code> (like <code>test_product_detail_page_renders</code>), will be skipped.</li>
+<li><strong>Why this approach?</strong>: This offers the most granular control. It's the go-to method for debugging a single failing test within a class or for focusing on the development of one specific test case among many.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Understanding Pytest Node IDs</strong></p>
+<p>The string that <code>pytest</code> uses to uniquely identify any collectible test item (a file, a class, a function, or a method) is called a <strong>Node ID</strong>. The general format you've seen is:</p>
+<p><code>path/to/test_file.py::ClassName::function_or_method_name</code></p>
+<ul>
+<li>The <code>path/to/test_file.py</code> part is the file system path to the test module.</li>
+<li><code>ClassName</code> is optional; it's omitted if the test is a standalone function within the file.</li>
+<li><code>function_or_method_name</code> is the name of the test function or method.</li>
+<li>The <code>::</code> separator is key to constructing these IDs.</li>
+</ul>
+<p>When you provide one of these Node IDs (or a partial one, like just a file path) to the <code>pytest</code> command, you're telling <code>pytest</code> exactly which part of the test collection tree you're interested in. This Node ID system is a core concept in <code>pytest</code> and is used not only for running specific tests but also for other features like test selection with markers or keywords (which we'll cover in sections 19.2 and 19.3).</p>
+<p><strong>Practical Implications and Best Practices</strong></p>
+<ul>
+<li><strong>Speed and Focus:</strong> The primary benefit of running specific tests is the immediate feedback loop. When you're deep in thought solving a problem, waiting for a full test suite can break your concentration.</li>
+<li><strong>Development Workflow:</strong> Integrate these commands into your daily development. When working on a feature, identify the relevant tests and run them frequently.</li>
+<li><strong>Debugging:</strong> When a test fails (especially in a CI environment or a full test run), the first step is often to run that single test locally to reproduce and diagnose the issue.</li>
+<li><strong>Not a Replacement for Full Runs:</strong> While incredibly useful during development, running specific tests should not replace running your entire test suite. Always ensure all tests pass before committing code, pushing changes, or deploying. Your CI (Continuous Integration) server should always run the complete suite to catch any unintended side effects.</li>
+</ul>
+<p>By mastering these targeting techniques, you make <code>pytest</code> a more powerful and responsive tool in your Django development arsenal, helping you build and maintain high-quality applications with greater confidence and efficiency.</p>
+<h3 id="192-filtering-by-test-name--k-expression" tabindex="-1"><a class="anchor" href="#192-filtering-by-test-name--k-expression" name="192-filtering-by-test-name--k-expression" tabindex="-1"><span class="octicon octicon-link"></span></a>19.2 Filtering by Test Name (<code>-k 'expression'</code>)</h3>
+<p>As your test suite grows, running every single test each time you make a small change can become inefficient and time-consuming. You might be working on a specific feature, fixing a particular bug, or just want to iterate quickly on a small subset of tests. Pytest provides a powerful mechanism for this: filtering tests based on keywords or expressions found in their names using the <code>-k</code> command-line option.</p>
+<p>The <code>-k</code> option allows you to specify an expression. Pytest will then select and run only those tests whose names (including the module name, class name, and function name, concatenated with <code>::</code> and <code>.</code> separators) match this expression. This is an incredibly flexible way to target specific tests without needing to modify your test files.</p>
+<p>Let's consider a hypothetical test file to illustrate how <code>-k</code> works. Imagine we have the following tests in a file named <code>tests/test_user_flows.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_user_flows.py</span>
+
+<span class="token keyword">import</span> pytest
+
+<span class="token keyword">def</span> <span class="token function">test_user_login_successful</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Simulates a successful user login."""</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_user_login_failed_due_to_wrong_password</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Simulates a failed user login due to incorrect password."""</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_user_registration_successful</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Simulates a successful user registration."""</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_admin_login_successful</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Simulates a successful admin login."""</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">class</span> <span class="token class-name">TestUserProfile</span><span class="token punctuation">:</span>
+    <span class="token keyword">def</span> <span class="token function">test_profile_view_loads_for_authenticated_user</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""Checks if the profile view loads for a logged-in user."""</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_profile_edit_successful</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""Simulates a successful profile edit."""</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+    <span class="token keyword">def</span> <span class="token function">test_profile_edit_fails_with_invalid_data</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""Simulates a failed profile edit due to invalid data."""</span>
+        <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_password_reset_request_sent_successfully</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Simulates sending a password reset request."""</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_another_feature_unrelated_to_login</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""A test for a completely different feature."""</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+</code></pre>
+<p>Let's examine this code in detail:</p>
+<ol>
+<li><strong><code>import pytest</code></strong>: While not strictly necessary for these simple <code>assert True</code> examples, it's good practice to include it, especially if you plan to use pytest features like fixtures or markers later.</li>
+<li><strong><code>def test_user_login_successful(): ...</code></strong>: This is a standard pytest test function. Its name clearly indicates what it's testing. The docstring provides further context.</li>
+<li><strong><code>def test_user_login_failed_due_to_wrong_password(): ...</code></strong>: Another test function, this one for a failure scenario related to login. Notice the descriptive name.</li>
+<li><strong><code>def test_user_registration_successful(): ...</code></strong>: A test for user registration.</li>
+<li><strong><code>def test_admin_login_successful(): ...</code></strong>: A test specifically for admin login.</li>
+<li><strong><code>class TestUserProfile:</code></strong>: Pytest also discovers tests within classes that are prefixed with <code>Test</code>. This class groups tests related to user profiles.
+<ul>
+<li><strong><code>def test_profile_view_loads_for_authenticated_user(self): ...</code></strong>: A test method within the <code>TestUserProfile</code> class.</li>
+<li><strong><code>def test_profile_edit_successful(self): ...</code></strong>: Another test method for profile editing.</li>
+<li><strong><code>def test_profile_edit_fails_with_invalid_data(self): ...</code></strong>: A test method for a failure case in profile editing.</li>
+</ul>
+</li>
+<li><strong><code>def test_password_reset_request_sent_successfully(): ...</code></strong>: A test for the password reset functionality.</li>
+<li><strong><code>def test_another_feature_unrelated_to_login(): ...</code></strong>: This test is intentionally named to be distinct from login-related tests, helping us illustrate targeted filtering.</li>
+</ol>
+<p>All these tests currently just <code>assert True</code> for simplicity. In a real application, they would contain meaningful Arrange-Act-Assert steps. The key takeaway here is the naming convention, which <code>-k</code> leverages.</p>
+<h4 id="basic-substring-matching" tabindex="-1"><a class="anchor" href="#basic-substring-matching" name="basic-substring-matching" tabindex="-1"><span class="octicon octicon-link"></span></a>Basic Substring Matching</h4>
+<p>The simplest way to use <code>-k</code> is to provide a substring. Pytest will run any test whose fully qualified name contains that substring. The matching is case-insensitive by default.</p>
+<p>To run all tests related to "login":</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"login"</span>
+</code></pre>
+<p>Let's break this down:</p>
+<ol>
+<li><strong><code>pytest</code></strong>: The command to invoke the pytest test runner.</li>
+<li><strong><code>-k "login"</code></strong>: This is the core of the filtering.
+<ul>
+<li><strong><code>-k</code></strong>: The option that tells pytest to filter by keyword expression.</li>
+<li><strong><code>"login"</code></strong>: The expression itself. We've enclosed it in quotes, which is a good habit, especially if your expression contains spaces or special characters that the shell might interpret.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Expected Outcome:</strong></p>
+<p>Pytest would select and run the following tests from <code>tests/test_user_flows.py</code>:</p>
+<ul>
+<li><code>test_user_login_successful</code></li>
+<li><code>test_user_login_failed_due_to_wrong_password</code></li>
+<li><code>test_admin_login_successful</code></li>
+</ul>
+<p>It would <em>not</em> run:</p>
+<ul>
+<li><code>test_user_registration_successful</code> (doesn't contain "login")</li>
+<li><code>TestUserProfile::test_profile_view_loads_for_authenticated_user</code> (doesn't contain "login")</li>
+<li><code>TestUserProfile::test_profile_edit_successful</code> (doesn't contain "login")</li>
+<li><code>TestUserProfile::test_profile_edit_fails_with_invalid_data</code> (doesn't contain "login")</li>
+<li><code>test_password_reset_request_sent_successfully</code> (doesn't contain "login")</li>
+<li><code>test_another_feature_unrelated_to_login</code> (doesn't contain "login")</li>
+</ul>
+<p><strong>Why this is useful:</strong> If you've just made changes to the login functionality, you can quickly run only the relevant tests to get fast feedback.</p>
+<h4 id="using-logical-operators-and-or-not" tabindex="-1"><a class="anchor" href="#using-logical-operators-and-or-not" name="using-logical-operators-and-or-not" tabindex="-1"><span class="octicon octicon-link"></span></a>Using Logical Operators: <code>and</code>, <code>or</code>, <code>not</code></h4>
+<p>The real power of <code>-k</code> comes from its ability to understand logical operators within the expression. You can combine keywords using <code>and</code>, <code>or</code>, and <code>not</code>.</p>
+<p><strong>1. Using <code>and</code></strong></p>
+<p>To run tests that contain "user" AND "login" in their names:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"user and login"</span>
+</code></pre>
+<p><strong>Expected Outcome:</strong></p>
+<p>This command would select:</p>
+<ul>
+<li><code>test_user_login_successful</code></li>
+<li><code>test_user_login_failed_due_to_wrong_password</code></li>
+</ul>
+<p>It would <em>not</em> run <code>test_admin_login_successful</code> because, while it contains "login", it does not contain "user". It also wouldn't run <code>test_user_registration_successful</code> because, while it contains "user", it doesn't contain "login".</p>
+<p><strong>Why this is useful:</strong> This allows for more precise targeting. For example, if you have <code>test_admin_login</code> and <code>test_user_login</code>, <code>and</code> helps you differentiate.</p>
+<p><strong>2. Using <code>or</code></strong></p>
+<p>To run tests that contain "login" OR "registration":</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"login or registration"</span>
+</code></pre>
+<p><strong>Expected Outcome:</strong></p>
+<p>This command would select:</p>
+<ul>
+<li><code>test_user_login_successful</code></li>
+<li><code>test_user_login_failed_due_to_wrong_password</code></li>
+<li><code>test_user_registration_successful</code></li>
+<li><code>test_admin_login_successful</code></li>
+</ul>
+<p><strong>Why this is useful:</strong> Useful when you're working on related functionalities, like the entire authentication flow which might include both login and registration.</p>
+<p><strong>3. Using <code>not</code></strong></p>
+<p>To run tests that contain "login" BUT NOT "admin":</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"login and not admin"</span>
+</code></pre>
+<p><strong>Expected Outcome:</strong></p>
+<p>This command would select:</p>
+<ul>
+<li><code>test_user_login_successful</code></li>
+<li><code>test_user_login_failed_due_to_wrong_password</code></li>
+</ul>
+<p>It would exclude <code>test_admin_login_successful</code> because of the <code>not admin</code> condition.</p>
+<p><strong>Why this is useful:</strong> Excellent for excluding specific subsets of tests. For instance, if admin tests are slower or require special setup you want to bypass for now.</p>
+<p><strong>4. Combining Operators with Parentheses</strong></p>
+<p>You can use parentheses <code>()</code> to group expressions for more complex logic, just like in Python.</p>
+<p>To run tests that are related to "profile" AND (either "edit" OR "view"):</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"profile and (edit or view)"</span>
+</code></pre>
+<p><strong>Expected Outcome:</strong></p>
+<p>This command would select tests from the <code>TestUserProfile</code> class:</p>
+<ul>
+<li><code>TestUserProfile::test_profile_view_loads_for_authenticated_user</code> (matches "profile" and "view")</li>
+<li><code>TestUserProfile::test_profile_edit_successful</code> (matches "profile" and "edit")</li>
+<li><code>TestUserProfile::test_profile_edit_fails_with_invalid_data</code> (matches "profile" and "edit")</li>
+</ul>
+<p>It would <em>not</em> run <code>test_user_login_successful</code> because, although it might be part of a user flow, its name doesn't contain "profile".</p>
+<p><strong>Why this is useful:</strong> Parentheses allow you to build sophisticated filtering logic to precisely target the tests you need, mirroring how you might structure conditional logic in your code.</p>
+<h4 id="matching-against-class-and-module-names" tabindex="-1"><a class="anchor" href="#matching-against-class-and-module-names" name="matching-against-class-and-module-names" tabindex="-1"><span class="octicon octicon-link"></span></a>Matching Against Class and Module Names</h4>
+<p>It's crucial to understand that the <code>-k</code> expression matches against the <em>fully qualified name</em> of a test item. This name is constructed by pytest and typically looks like <code>path/to/your/test_module.py::ClassName::test_function_name</code> (if inside a class) or <code>path/to/your/test_module.py::test_function_name</code> (if a standalone function).</p>
+<p>So, you can filter by parts of the module name or class name too.</p>
+<ol>
+<li>
+<p><strong>Filtering by Module Substring:</strong>
+If our file was <code>tests/authentication/test_login_flows.py</code>, then:
+<code>pytest -k "authentication"</code> would run all tests in that file.
+With our current <code>tests/test_user_flows.py</code>:
+<code>pytest -k "user_flows"</code> would run all tests in <code>tests/test_user_flows.py</code>.</p>
+</li>
+<li>
+<p><strong>Filtering by Class Name:</strong>
+To run all tests within the <code>TestUserProfile</code> class:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"TestUserProfile"</span>
+</code></pre>
+<p><strong>Expected Outcome:</strong>
+This would select all methods within the <code>TestUserProfile</code> class:</p>
+<ul>
+<li><code>TestUserProfile::test_profile_view_loads_for_authenticated_user</code></li>
+<li><code>TestUserProfile::test_profile_edit_successful</code></li>
+<li><code>TestUserProfile::test_profile_edit_fails_with_invalid_data</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Combining Class Name with Method Substring:</strong>
+To run only the "edit" related tests within the <code>TestUserProfile</code> class:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-k</span> <span class="token string">"TestUserProfile and edit"</span>
+</code></pre>
+<p><strong>Expected Outcome:</strong></p>
+<ul>
+<li><code>TestUserProfile::test_profile_edit_successful</code></li>
+<li><code>TestUserProfile::test_profile_edit_fails_with_invalid_data</code></li>
+</ul>
+</li>
+</ol>
+<p><strong>Why this is important:</strong> This behavior means your naming conventions for files and classes also contribute to your ability to filter tests effectively. Well-structured test suites with descriptive names at all levels (module, class, function) become much easier to navigate and manage with <code>-k</code>.</p>
+<h4 id="practical-scenarios-and-benefits" tabindex="-1"><a class="anchor" href="#practical-scenarios-and-benefits" name="practical-scenarios-and-benefits" tabindex="-1"><span class="octicon octicon-link"></span></a>Practical Scenarios and Benefits</h4>
+<ul>
+<li><strong>Focused Development:</strong> When implementing a new feature, say "two-factor authentication," you can name your tests <code>test_2fa_setup</code>, <code>test_2fa_login_success</code>, etc. Then, <code>pytest -k "2fa"</code> runs only these, providing rapid feedback.</li>
+<li><strong>Bug Investigation:</strong> If a bug is reported in the "password reset email sending" part of your application, you could run <code>pytest -k "password and reset and not ui"</code> to focus on backend logic tests for password reset, excluding potentially slower UI tests.</li>
+<li><strong>Iterative Refinement:</strong> After making a small code change, you can quickly run the specific tests covering that area (e.g., <code>pytest -k "specific_function_name_being_tested"</code>) instead of the whole suite. This drastically speeds up the TDD (Test-Driven Development) or BDD (Behavior-Driven Development) cycle.</li>
+<li><strong>Smoke Tests:</strong> You might have a set of critical path tests named with a common keyword like "smoke" (e.g., <code>test_smoke_user_login</code>, <code>test_smoke_critical_purchase_flow</code>). Running <code>pytest -k "smoke"</code> can give you a quick health check of the application.</li>
+</ul>
+<h4 id="case-sensitivity" tabindex="-1"><a class="anchor" href="#case-sensitivity" name="case-sensitivity" tabindex="-1"><span class="octicon octicon-link"></span></a>Case Sensitivity</h4>
+<p>By default, the matching performed by <code>-k</code> is <strong>case-insensitive</strong>. This is generally convenient.
+So, <code>pytest -k "login"</code> is equivalent to <code>pytest -k "LOGIN"</code> or <code>pytest -k "Login"</code>. They would all match <code>test_user_login_successful</code>.</p>
+<h4 id="common-pitfalls-and-tips" tabindex="-1"><a class="anchor" href="#common-pitfalls-and-tips" name="common-pitfalls-and-tips" tabindex="-1"><span class="octicon octicon-link"></span></a>Common Pitfalls and Tips</h4>
+<ol>
+<li>
+<p><strong>Overly Broad Expressions:</strong></p>
+<ul>
+<li><strong>Pitfall:</strong> Using a very common word like <code>pytest -k "test"</code> might select almost every test if "test" is part of your module or function naming convention (which it usually is!).</li>
+<li><strong>Tip:</strong> Be as specific as reasonably possible with your keywords. Combine with <code>and</code> to narrow down the selection.</li>
+</ul>
+</li>
+<li>
+<p><strong>Typos in Expressions:</strong></p>
+<ul>
+<li><strong>Pitfall:</strong> A simple typo like <code>pytest -k "loginn"</code> (extra 'n') will likely result in no tests being selected.</li>
+<li><strong>Tip:</strong> Double-check your expression. If no tests run, this is the first thing to verify.</li>
+</ul>
+</li>
+<li>
+<p><strong>Quoting the Expression:</strong></p>
+<ul>
+<li><strong>Pitfall:</strong> If your expression contains spaces or special characters (like <code>(</code> or <code>)</code> for grouping with <code>and</code>/<code>or</code>), failing to quote it can lead to your shell interpreting parts of the expression instead of passing it whole to pytest. For example, <code>pytest -k login and user</code> might be interpreted by some shells as trying to run <code>pytest -k login</code> and then a separate command <code>user</code>.</li>
+<li><strong>Tip:</strong> <strong>Always enclose your <code>-k</code> expression in single or double quotes</strong> (e.g., <code>pytest -k "user and login"</code> or <code>pytest -k 'user and login'</code>). This ensures the entire expression is passed to pytest correctly.</li>
+</ul>
+</li>
+<li>
+<p><strong>Understanding Match Scope:</strong></p>
+<ul>
+<li><strong>Pitfall:</strong> Forgetting that <code>-k</code> matches against the full node ID (module::class::function). You might try <code>pytest -k "my_function"</code> and be surprised if it also matches <code>test_other_module.py::TestMyClass::test_calls_my_function_indirectly</code> if "my_function" appears in that test's name.</li>
+<li><strong>Tip:</strong> Be mindful of your naming. If you need very precise function targeting and names are ambiguous, you might combine <code>-k</code> with specifying the file path: <code>pytest tests/test_specific_module.py -k "my_function_exact_name"</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Combining with Other Filters:</strong></p>
+<ul>
+<li><strong>Tip:</strong> Remember that <code>-k</code> can be used alongside other pytest selection mechanisms. For example, you can specify a directory/file and then further filter with <code>-k</code>:<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest tests/test_user_flows.py <span class="token parameter variable">-k</span> <span class="token string">"profile and edit"</span>
+</code></pre>
+This command first tells pytest to only look in <code>tests/test_user_flows.py</code> and then, within that file, apply the <code>-k "profile and edit"</code> filter. This is often more efficient than letting <code>-k</code> search through the entire project if you already know where the relevant tests are. You can also combine it with marker expressions (<code>-m</code>), which we'll cover in Section 19.3.</li>
+</ul>
+</li>
+</ol>
+<p>The <code>-k</code> option is a fundamental tool for efficient test execution in pytest. By mastering its expression syntax and understanding how it matches against test names, you can significantly reduce the time spent waiting for tests and maintain a more focused and productive development workflow. It encourages descriptive naming of your tests, which is a beneficial practice in itself, making your test suite more readable and maintainable.</p>
+<h3 id="193-filtering-by-markers--m-marker_name" tabindex="-1"><a class="anchor" href="#193-filtering-by-markers--m-marker_name" name="193-filtering-by-markers--m-marker_name" tabindex="-1"><span class="octicon octicon-link"></span></a>19.3 Filtering by Markers (<code>-m 'marker_name'</code>)</h3>
+<p>In the previous sections, we explored how to run specific test files, classes, or functions by their names. This is incredibly useful for focused testing. However, as your test suite grows, you'll often find that tests related by <em>concept</em> or <em>characteristic</em> are spread across different files and modules. For instance, you might have "slow" tests in <code>tests/test_views.py</code>, <code>tests/test_models.py</code>, and <code>tests/test_integration_flows.py</code>. Running all slow tests using name-based filtering would be cumbersome. This is where <code>pytest</code> markers shine.</p>
+<p><strong>What are Pytest Markers?</strong></p>
+<p>At their core, <strong>markers</strong> are a way to apply metadata (or "tags," "labels") to your test functions or classes. Think of them like keywords you can attach to tests to categorize them. This categorization then allows <code>pytest</code> to select or deselect tests based on these markers.</p>
+<p>The primary "why" behind markers is to provide a flexible and powerful mechanism for grouping and selecting tests that go beyond their file location or name. This is crucial for:</p>
+<ol>
+<li><strong>Selective Execution:</strong> Running only a subset of tests (e.g., "run all <code>smoke</code> tests," "run all tests except <code>slow</code> ones").</li>
+<li><strong>Applying Behavior:</strong> Some markers can also influence test behavior or inject specific fixtures (though we'll focus on the selection aspect here). <code>pytest-django</code>'s <code>@pytest.mark.django_db</code> is a prime example of a marker that changes behavior (enabling database access).</li>
+<li><strong>Organization:</strong> Clearly identifying the nature or purpose of a test directly in the code.</li>
+</ol>
+<p><strong>Applying Markers to Tests</strong></p>
+<p>You apply a marker to a test function (or class) using the <code>@pytest.mark.your_marker_name</code> decorator. The <code>your_marker_name</code> can be any string you choose, ideally descriptive of the category.</p>
+<p>Let's create a few example tests with different markers:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_example_markers.py</span>
+
+<span class="token keyword">import</span> pytest
+<span class="token keyword">import</span> time
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>slow</span>
+<span class="token keyword">def</span> <span class="token function">test_data_processing</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    time<span class="token punctuation">.</span>sleep<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span> <span class="token comment"># Simulate a slow operation</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>smoke</span>
+<span class="token keyword">def</span> <span class="token function">test_quick_check</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>smoke</span>
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>regression</span>
+<span class="token keyword">def</span> <span class="token function">test_another_quick_check_for_regression</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> <span class="token number">1</span> <span class="token operator">+</span> <span class="token number">1</span> <span class="token operator">==</span> <span class="token number">2</span>
+
+<span class="token keyword">def</span> <span class="token function">test_unmarked</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> <span class="token string">"hello"</span> <span class="token operator">==</span> <span class="token string">"hello"</span>
+</code></pre>
+<p>Let's examine this code in detail:</p>
+<ol>
+<li>
+<p><strong><code>import pytest</code> and <code>import time</code></strong>:</p>
+<ul>
+<li>We import <code>pytest</code> to use its marker functionality.</li>
+<li><code>time</code> is imported solely to simulate a delay in <code>test_data_processing</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>@pytest.mark.slow</code></strong>:</p>
+<ul>
+<li>This line applies the marker named <code>slow</code> to the <code>test_data_processing</code> function.</li>
+<li>This signifies that this test is expected to take a longer time to run compared to others.</li>
+<li>The choice of <code>slow</code> is arbitrary but common; you can name markers anything meaningful to your project.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>def test_data_processing(): ...</code></strong>:</p>
+<ul>
+<li>A simple test function that simulates a slow operation using <code>time.sleep(1)</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>@pytest.mark.smoke</code></strong>:</p>
+<ul>
+<li>This applies the <code>smoke</code> marker to <code>test_quick_check</code>.</li>
+<li>"Smoke tests" are typically quick, high-level tests run to ensure the most critical functionalities of an application are working.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>@pytest.mark.smoke</code> and <code>@pytest.mark.regression</code></strong>:</p>
+<ul>
+<li>The <code>test_another_quick_check_for_regression</code> function has <em>two</em> markers applied: <code>smoke</code> and <code>regression</code>.</li>
+<li>This demonstrates that a single test can belong to multiple categories. "Regression tests" are run to ensure that new changes haven't broken existing functionality.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>def test_unmarked(): ...</code></strong>:</p>
+<ul>
+<li>This test has no markers applied. It will run by default if no marker filtering is used, or if filters don't explicitly exclude it.</li>
+</ul>
+</li>
+</ol>
+<p>This setup allows us to categorize our tests. <code>test_data_processing</code> is marked as <code>slow</code>. <code>test_quick_check</code> is a <code>smoke</code> test. <code>test_another_quick_check_for_regression</code> is both a <code>smoke</code> test and a <code>regression</code> test. <code>test_unmarked</code> has no special category.</p>
+<p><strong>Running Tests with Specific Markers: The <code>-m</code> Option</strong></p>
+<p>To run only the tests that have a specific marker, you use the <code>-m</code> command-line option followed by the marker name.</p>
+<ol>
+<li>
+<p><strong>Running only <code>smoke</code> tests:</strong></p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-m</span> smoke
+</code></pre>
+<ul>
+<li><strong><code>pytest -m smoke</code></strong>: This command instructs <code>pytest</code> to discover all tests and then run only those that have the <code>@pytest.mark.smoke</code> decorator.</li>
+</ul>
+<p>If you run this command in the directory containing <code>test_example_markers.py</code>, you'd expect an output similar to this (verbosity may vary):</p>
+<pre><code>============================= test session starts ==============================
+...
+collected 4 items / 2 deselected / 2 selected
+
+tests/test_example_markers.py ..                                         [100%]
+
+======================= 2 passed, 2 deselected in 0.02s =======================
+</code></pre>
+<p>Notice that <code>pytest</code> collected 4 items (our four tests) but deselected 2 (<code>test_data_processing</code> and <code>test_unmarked</code>) and selected 2 (<code>test_quick_check</code> and <code>test_another_quick_check_for_regression</code>).</p>
+</li>
+<li>
+<p><strong>Running only <code>slow</code> tests:</strong></p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-m</span> slow
+</code></pre>
+<ul>
+<li><strong><code>pytest -m slow</code></strong>: This command will run only the tests marked with <code>slow</code>.</li>
+</ul>
+<p>Expected output:</p>
+<pre><code>============================= test session starts ==============================
+...
+collected 4 items / 3 deselected / 1 selected
+
+tests/test_example_markers.py .                                          [100%]
+
+======================= 1 passed, 3 deselected in 1.02s =======================
+</code></pre>
+<p>Here, only <code>test_data_processing</code> was selected and run. The 1-second delay from <code>time.sleep(1)</code> is reflected in the execution time.</p>
+</li>
+</ol>
+<p><strong>Advanced Marker Expressions</strong></p>
+<p>The <code>-m</code> option is more powerful than just selecting a single marker. You can use expressions to combine markers using <code>and</code>, <code>or</code>, and <code>not</code>, and group them with parentheses. The expression must be enclosed in quotes if it contains spaces or special characters.</p>
+<ol>
+<li>
+<p><strong>Excluding markers with <code>not</code></strong>:
+To run all tests <em>except</em> those marked <code>slow</code>:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-m</span> <span class="token string">"not slow"</span>
+</code></pre>
+<ul>
+<li><strong><code>pytest -m "not slow"</code></strong>: This tells <code>pytest</code> to select all tests that <em>do not</em> have the <code>slow</code> marker.</li>
+<li>In our example, this would run <code>test_quick_check</code>, <code>test_another_quick_check_for_regression</code>, and <code>test_unmarked</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Combining markers with <code>and</code></strong>:
+To run tests that have <em>both</em> the <code>smoke</code> marker AND the <code>regression</code> marker:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-m</span> <span class="token string">"smoke and regression"</span>
+</code></pre>
+<ul>
+<li><strong><code>pytest -m "smoke and regression"</code></strong>: This selects tests that are decorated with <code>@pytest.mark.smoke</code> <em>and</em> <code>@pytest.mark.regression</code>.</li>
+<li>In our example, only <code>test_another_quick_check_for_regression</code> would run.</li>
+</ul>
+</li>
+<li>
+<p><strong>Combining markers with <code>or</code></strong>:
+To run tests that have <em>either</em> the <code>smoke</code> marker OR the <code>slow</code> marker:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-m</span> <span class="token string">"smoke or slow"</span>
+</code></pre>
+<ul>
+<li><strong><code>pytest -m "smoke or slow"</code></strong>: This selects tests decorated with <code>@pytest.mark.smoke</code> <em>or</em> <code>@pytest.mark.slow</code> (or both, if a test had both).</li>
+<li>In our example, <code>test_data_processing</code>, <code>test_quick_check</code>, and <code>test_another_quick_check_for_regression</code> would run.</li>
+</ul>
+</li>
+<li>
+<p><strong>Complex expressions with parentheses</strong>:
+You can build more complex logic using parentheses for grouping, just like in Python boolean expressions. For example, to run tests that are <code>smoke</code> tests but <em>not</em> <code>slow</code> tests:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-m</span> <span class="token string">"smoke and not slow"</span>
+</code></pre>
+<ul>
+<li><strong><code>pytest -m "smoke and not slow"</code></strong>: This selects tests that have the <code>smoke</code> marker but do not have the <code>slow</code> marker.</li>
+<li>In our example, this would run <code>test_quick_check</code> and <code>test_another_quick_check_for_regression</code>.</li>
+</ul>
+</li>
+</ol>
+<p>These expressions provide a very fine-grained control over which tests are executed, allowing you to tailor test runs to specific needs, such as quick feedback cycles during development or comprehensive checks before a release.</p>
+<p><strong>Registering Markers in <code>pytest.ini</code></strong></p>
+<p>When you use custom markers like <code>slow</code>, <code>smoke</code>, or <code>regression</code> without registering them, <code>pytest</code> might issue a warning:</p>
+<pre><code>PytestUnknownMarkWarning: Unknown pytest.mark.slow - is this a typo?
+You can register custom marks to avoid this warning - for details, see
+https://docs.pytest.org/en/stable/how-to/mark.html#registering-marks
+</code></pre>
+<p>While the tests will still run correctly, registering your markers is a best practice for several important reasons:</p>
+<ol>
+<li><strong>Avoids Typos:</strong> Registration helps catch typos in marker names. If you try to use an unregistered marker that's a misspelling of a registered one, <code>pytest</code> will warn you.</li>
+<li><strong>Documentation:</strong> You can provide a description for each marker, making it clear what the marker signifies. This acts as documentation for your test suite.</li>
+<li><strong>Clarity and Intent:</strong> It makes your <code>pytest</code> configuration explicit about the markers your project uses.</li>
+<li><strong>Enables <code>pytest --markers</code>:</strong> Once registered, markers will appear in the output of <code>pytest --markers</code>, which lists all available markers along with their descriptions.</li>
+</ol>
+<p>You register markers in your <code>pytest.ini</code> (or <code>pyproject.toml</code> or <code>setup.cfg</code>) file in the project root directory.</p>
+<pre class="language-ini" tabindex="0"><code class="language-ini"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># pytest.ini</span>
+
+<span class="token section"><span class="token punctuation">[</span><span class="token section-name selector">pytest</span><span class="token punctuation">]</span></span>
+<span class="token key attr-name">DJANGO_SETTINGS_MODULE</span> <span class="token punctuation">=</span> <span class="token value attr-value">myproject.settings</span>
+<span class="token key attr-name">python_files</span> <span class="token punctuation">=</span> <span class="token value attr-value">tests.py test_*.py *_tests.py</span>
+<span class="token key attr-name">markers</span> <span class="token punctuation">=</span>
+    slow: marks tests as slow to run (e.g., integration or E2E tests)
+    smoke: marks tests as smoke tests for quick sanity checks
+    regression: marks tests intended to catch regressions in existing functionality
+    e2e: marks end-to-end tests that involve browser interaction
+</code></pre>
+<p>Let's break down this <code>pytest.ini</code> configuration:</p>
+<ol>
+<li><strong><code>[pytest]</code></strong>: This section header indicates that the following lines are configuration options for <code>pytest</code>.</li>
+<li><strong><code>DJANGO_SETTINGS_MODULE = myproject.settings</code></strong>: This line (which you'd have from Chapter 2) tells <code>pytest-django</code> where to find your Django settings file.</li>
+<li><strong><code>python_files = tests.py test_*.py *_tests.py</code></strong>: This line (also familiar) tells <code>pytest</code> which files to look for when discovering tests.</li>
+<li><strong><code>markers =</code></strong>: This key introduces the list of custom markers to be registered.</li>
+<li><strong><code>slow: marks tests as slow to run (e.g., integration or E2E tests)</code></strong>:
+<ul>
+<li><code>slow</code>: This is the name of the marker (the part you use in <code>@pytest.mark.slow</code>).</li>
+<li><code>: </code>: A colon separates the marker name from its description.</li>
+<li><code>marks tests as slow to run...</code>: This is the description that will appear when you run <code>pytest --markers</code>. It explains the purpose of the <code>slow</code> marker.</li>
+</ul>
+</li>
+<li><strong><code>smoke: marks tests as smoke tests...</code></strong> and <strong><code>regression: marks tests intended to catch regressions...</code></strong>: Similar registrations for the <code>smoke</code> and <code>regression</code> markers, each with a descriptive text.</li>
+<li><strong><code>e2e: marks end-to-end tests that involve browser interaction</code></strong>: We've proactively added an <code>e2e</code> marker, which will be very useful when we get to Part 3 on End-to-End testing with Playwright. Tests using <code>live_server</code> and the <code>page</code> fixture are prime candidates for an <code>e2e</code> marker.</li>
+</ol>
+<p>With these markers registered in <code>pytest.ini</code>, the <code>PytestUnknownMarkWarning</code> will disappear. Furthermore, you can now get a helpful list of all available markers:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--markers</span>
+</code></pre>
+<p>This command will output something like:</p>
+<pre><code>@pytest.mark.django_db:  Mark the test as using the database.
+@pytest.mark.filterwarnings(warning): add a warning filter to the given test.
+@pytest.mark.forked: run test in a subprocess that forks (Unix only)
+@pytest.mark.integration: (no description)
+@pytest.mark.no_cover: Mark test to be excluded from coverage statistics.
+@pytest.mark.skip(reason=None): skip the given test function with an optional reason.
+@pytest.mark.skipif(condition, ..., *, reason=None): skip the given test function if any of the conditions evaluate to True.
+@pytest.mark.slow: marks tests as slow to run (e.g., integration or E2E tests)
+@pytest.mark.smoke: marks tests as smoke tests for quick sanity checks
+@pytest.mark.regression: marks tests intended to catch regressions in existing functionality
+@pytest.mark.e2e: marks end-to-end tests that involve browser interaction
+@pytest.mark.usefixtures(fixturename1, fixturename2, ...): use fixtures on a test function or class.
+@pytest.mark.xfail(condition, ..., *, reason=None, run=True, raises=None, strict=False): mark the test function as an expected failure if any of the conditions evaluate to True.
+</code></pre>
+<p><em>(Note: The exact list will include built-in pytest markers and markers from plugins like <code>pytest-django</code>)</em>.</p>
+<p>You can see our custom markers (<code>slow</code>, <code>smoke</code>, <code>regression</code>, <code>e2e</code>) listed with their descriptions, making it easy for anyone on the team to understand the available categories.</p>
+<p><strong>Practical Use Cases and Best Practices for Markers</strong></p>
+<p>Markers are a powerful tool when used thoughtfully. Here are some common use cases and best practices:</p>
+<ul>
+<li>
+<p><strong>Speed Categories:</strong></p>
+<ul>
+<li><code>@pytest.mark.smoke</code>: For a very small, very fast set of tests that check critical paths. Ideal for running frequently during development or as a quick pre-commit check.</li>
+<li><code>@pytest.mark.fast</code> (or rely on unmarked tests being fast): For typical unit tests.</li>
+<li><code>@pytest.mark.slow</code>: For tests that take significant time, like some integration tests or most E2E tests. You might run these less frequently, e.g., on a CI server or before a release.
+<ul>
+<li><em>Why this is useful:</em> Avoids running time-consuming tests on every minor change, speeding up the development feedback loop.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Test Type Categories (aligning with the Testing Pyramid):</strong></p>
+<ul>
+<li><code>@pytest.mark.unit</code>: Explicitly mark unit tests.</li>
+<li><code>@pytest.mark.integration</code>: Mark integration tests.</li>
+<li><code>@pytest.mark.e2e</code>: Mark end-to-end tests (especially those using <code>live_server</code> and Playwright).
+<ul>
+<li><em>Why this is useful:</em> Allows you to run all tests of a certain type, e.g., <code>pytest -m unit</code> or <code>pytest -m "not e2e"</code>. This helps in understanding test coverage at different levels.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Feature-Specific Markers:</strong></p>
+<ul>
+<li><code>@pytest.mark.user_auth</code>: For tests related to user authentication.</li>
+<li><code>@pytest.mark.search</code>: For tests related to the search functionality.</li>
+<li><code>@pytest.mark.payment</code>: For tests related to payment processing.
+<ul>
+<li><em>Why this is useful:</em> When working on a specific feature, you can run only the tests relevant to that feature (<code>pytest -m user_auth</code>), ensuring focused and faster feedback.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Other Common Markers:</strong></p>
+<ul>
+<li><code>@pytest.mark.regression</code>: Tests specifically designed to prevent past bugs from reappearing.</li>
+<li><code>@pytest.mark.api</code>: Tests for your Django REST framework API endpoints.</li>
+<li><code>@pytest.mark.ui</code>: A more general marker for UI-related tests if <code>e2e</code> is too broad or too narrow.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Best Practices:</strong></p>
+<ol>
+<li><strong>Choose Meaningful Names:</strong> Marker names should clearly indicate the category or purpose.</li>
+<li><strong>Be Consistent:</strong> Apply markers consistently across your test suite. If you decide <code>slow</code> is for tests over 1 second, stick to it.</li>
+<li><strong>Register Your Markers:</strong> Always register custom markers in <code>pytest.ini</code> to get descriptions, avoid warnings, and catch typos.</li>
+<li><strong>Don't Over-Mark:</strong> Applying too many granular markers can make filtering complex and less useful. Find a balance.</li>
+<li><strong>Combine with Directory Structure:</strong> Markers complement, not replace, good test organization by file and directory (as discussed in Chapter 18). For example, all E2E tests might live in <code>tests/e2e/</code> <em>and</em> be marked with <code>@pytest.mark.e2e</code>.</li>
+</ol>
+<p><strong>Connecting Markers to Django Testing Scenarios</strong></p>
+<p>In a Django project, markers become particularly valuable:</p>
+<ul>
+<li>You can mark all tests requiring Playwright and <code>live_server</code> with <code>@pytest.mark.e2e</code>. Then, during local development, you might run <code>pytest -m "not e2e"</code> for faster feedback, reserving <code>pytest -m e2e</code> for CI or pre-deployment checks.</li>
+<li>If you have tests for a specific Django app, say <code>myapp</code>, you could mark them <code>@pytest.mark.myapp_feature</code> to run them in isolation.</li>
+<li>Tests that interact with external services (which you might later mock) could be marked <code>@pytest.mark.external_api</code>.</li>
+</ul>
+<p>By thoughtfully applying markers, you gain precise control over your test execution strategy, allowing you to adapt your testing process to different stages of development and different needs, ultimately making your testing more efficient and effective. This moves you further away from the "run all tests all the time" approach and towards a more targeted and intelligent testing workflow.</p>
+<h2 id="194-controlling-output-verbosity--v--q--s" tabindex="-1"><a class="anchor" href="#194-controlling-output-verbosity--v--q--s" name="194-controlling-output-verbosity--v--q--s" tabindex="-1"><span class="octicon octicon-link"></span></a>19.4 Controlling Output Verbosity (<code>-v</code>, <code>-q</code>, <code>-s</code>)</h2>
+<p>When you run <code>pytest</code>, it provides feedback on the tests it discovers and executes. By default, this output is designed to be concise, often showing a dot (<code>.</code>) for each passing test, an <code>F</code> for failures, and an <code>E</code> for errors. While this is efficient for a quick overview, there are times when you need more detail, or conversely, less. <code>pytest</code> offers several command-line flags to control the verbosity and nature of its output, helping you tailor the feedback to your current needs, whether you're debugging a tricky issue or just want a high-level summary.</p>
+<p>The three primary flags for controlling output verbosity are:</p>
+<ul>
+<li><code>-v</code> (or <code>--verbose</code>): Increases the verbosity of the output.</li>
+<li><code>-q</code> (or <code>--quiet</code>): Decreases the verbosity, showing minimal information.</li>
+<li><code>-s</code> (or <code>--capture=no</code>): Disables output capturing, allowing <code>print()</code> statements and other standard output from your tests to be displayed immediately.</li>
+</ul>
+<p>Let's explore each of these in detail.</p>
+<h3 id="increasing-verbosity-with--v" tabindex="-1"><a class="anchor" href="#increasing-verbosity-with--v" name="increasing-verbosity-with--v" tabindex="-1"><span class="octicon octicon-link"></span></a>Increasing Verbosity with <code>-v</code></h3>
+<p>The <code>-v</code> flag is your go-to option when the default dot-per-test output isn't informative enough. It tells <code>pytest</code> to provide more explicit details about each test being run.</p>
+<p><strong>Why use <code>-v</code>?</strong></p>
+<ul>
+<li><strong>Clarity on Test Execution:</strong> You can see the full name of each test function (and class, if applicable) as it runs, along with its status (PASSED, FAILED, SKIPPED, XFAIL, XPASS). This is invaluable when you have many tests and want to pinpoint exactly which one is causing an issue or to simply track progress more granularly.</li>
+<li><strong>Better CI Logs:</strong> In Continuous Integration (CI) environments, verbose output can make logs easier to parse and understand, especially when diagnosing failures in an automated pipeline.</li>
+<li><strong>Understanding Test Grouping:</strong> If you organize tests within classes, <code>-v</code> makes it clearer how <code>pytest</code> is discovering and running tests from these groups.</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<p>When you run <code>pytest</code> with the <code>-v</code> flag:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-v</span>
+</code></pre>
+<p>Instead of seeing a series of dots, you'll see output similar to this for each test:</p>
+<pre><code>tests/test_your_app.py::test_some_feature PASSED
+tests/test_your_app.py::TestUserActions::test_user_login PASSED
+tests/test_your_app.py::TestUserActions::test_user_logout FAILED
+</code></pre>
+<p><strong>Let's break down this conceptual output:</strong></p>
+<ol>
+<li>
+<p><strong><code>tests/test_your_app.py::test_some_feature PASSED</code></strong>:</p>
+<ul>
+<li><code>tests/test_your_app.py</code>: The file containing the test.</li>
+<li><code>::test_some_feature</code>: The specific test function name.</li>
+<li><code>PASSED</code>: The explicit status of the test.</li>
+<li>This is much more informative than a single "<code>.</code>".</li>
+</ul>
+</li>
+<li>
+<p><strong><code>tests/test_your_app.py::TestUserActions::test_user_login PASSED</code></strong>:</p>
+<ul>
+<li><code>TestUserActions</code>: If the test is part of a class, the class name is included in the node ID.</li>
+<li>This helps you understand the organization and context of your tests.</li>
+</ul>
+</li>
+</ol>
+<p>You can even increase verbosity further with <code>-vv</code> or <code>-vvv</code>, though <code>-v</code> is the most commonly used level. Each additional <code>v</code> typically adds more low-level <code>pytest</code> debugging information, which is usually not needed for general test execution.</p>
+<p>The primary benefit of <code>-v</code> is the immediate visibility into <em>which</em> test is running and its <em>specific outcome</em>. This contrasts with the default mode where you might see <code>..F.</code> and then have to scroll up to match the <code>F</code> with the failure summary to identify the problematic test.</p>
+<h3 id="decreasing-verbosity-with--q" tabindex="-1"><a class="anchor" href="#decreasing-verbosity-with--q" name="decreasing-verbosity-with--q" tabindex="-1"><span class="octicon octicon-link"></span></a>Decreasing Verbosity with <code>-q</code></h3>
+<p>Sometimes, you want the opposite of verbose: you need <code>pytest</code> to be as quiet as possible. This is where the <code>-q</code> flag comes in.</p>
+<p><strong>Why use <code>-q</code>?</strong></p>
+<ul>
+<li><strong>Minimal Output:</strong> If you have a very large test suite and are confident in its stability, you might only care about the final summary (e.g., "X tests passed, Y failed").</li>
+<li><strong>Cleaner Logs (for success):</strong> In CI, if all tests pass, a quiet output can keep logs concise. The focus shifts to failures when they occur.</li>
+<li><strong>Speeding up Feedback (marginally):</strong> Less printing to the console can, in some environments, slightly speed up the perceived execution, though this is usually negligible.</li>
+</ul>
+<p><strong>How it works:</strong></p>
+<p>When you run <code>pytest</code> with the <code>-q</code> flag:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-q</span>
+</code></pre>
+<p>The output is significantly reduced. You might not see the individual dots or test names during execution. The progress bar or per-test status updates are often suppressed. The primary output will be the final summary of test results.</p>
+<p>For example, instead of:</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-4.5.1, playwright-0.4.2
+collected 3 items
+
+tests/test_example.py ...                                                [100%]
+
+============================== 3 passed in 0.01s ===============================
+</code></pre>
+<p>You might see something much more compact, potentially just the final summary or even less if all tests pass. The exact output can vary slightly based on <code>pytest</code> version and plugins.</p>
+<p>The core idea of <code>-q</code> is to minimize console chatter, focusing on the aggregate result rather than the individual journey of each test. It's useful when you trust your tests and primarily need a quick "all clear" signal or a list of failures without the preceding noise.</p>
+<h3 id="showing-print-statements-with--s-no-output-capturing" tabindex="-1"><a class="anchor" href="#showing-print-statements-with--s-no-output-capturing" name="showing-print-statements-with--s-no-output-capturing" tabindex="-1"><span class="octicon octicon-link"></span></a>Showing <code>print()</code> Statements with <code>-s</code> (No Output Capturing)</h3>
+<p>One of <code>pytest</code>'s helpful default behaviors is its output capturing mechanism. When your tests (or the code they call) use <code>print()</code> statements or log to standard output/error, <code>pytest</code> intercepts this output.</p>
+<ul>
+<li><strong>If the test passes:</strong> The captured output is discarded silently. This keeps your test report clean, showing only essential information.</li>
+<li><strong>If the test fails (or errors):</strong> The captured output is displayed along with the traceback and failure details. This is incredibly useful because it provides context—what your code was printing just before or during the failure.</li>
+</ul>
+<p>However, during active debugging, you often want to see <code>print()</code> statements <em>immediately</em> as they execute, regardless of whether the test passes or fails. This is precisely what the <code>-s</code> flag enables. The <code>-s</code> flag is a shortcut for <code>--capture=no</code>.</p>
+<p><strong>Why use <code>-s</code>?</strong></p>
+<ul>
+<li><strong>Live Debugging:</strong> When you're trying to understand the flow of a test or the state of variables at certain points, inserting <code>print()</code> statements is a common and effective debugging technique. <code>-s</code> ensures you see this output in real-time.</li>
+<li><strong>Observing Side Effects:</strong> If a function you're testing has print statements for logging or debugging that you want to observe during the test run.</li>
+<li><strong>Interacting with Debuggers:</strong> If you're using <code>pdb</code> or other debuggers that interact via standard input/output, disabling capture is often necessary.</li>
+</ul>
+<p><strong>Mental Model: The Output Bucket</strong></p>
+<p>Imagine <code>pytest</code> places an invisible "bucket" under each test as it runs.</p>
+<ul>
+<li>Any <code>print()</code> statements or standard output from your test code go into this bucket.</li>
+<li>If the test finishes successfully (<code>PASSED</code>), <code>pytest</code> takes the bucket and empties it without showing you its contents. Your console stays clean.</li>
+<li>If the test <code>FAILED</code> or has an <code>ERROR</code>, <code>pytest</code> shows you the contents of the bucket along with the error message. This helps you see what was printed leading up to the failure.</li>
+</ul>
+<p>The <code>-s</code> flag essentially tells <code>pytest</code>: "Don't use the bucket. Let all <code>print()</code> statements go directly to the console immediately."</p>
+<p><strong>Hands-On Example:</strong></p>
+<p>Let's create a simple test file to demonstrate this.</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_output_capture.py</span>
+
+<span class="token keyword">import</span> pytest
+
+<span class="token keyword">def</span> <span class="token function">test_with_print_passing</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\n--- Inside test_with_print_passing ---"</span><span class="token punctuation">)</span>
+    name <span class="token operator">=</span> <span class="token string">"Alice"</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"User's name is: </span><span class="token interpolation"><span class="token punctuation">{</span>name<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"--- Test test_with_print_passing finished ---"</span><span class="token punctuation">)</span>
+
+<span class="token keyword">def</span> <span class="token function">test_with_print_failing</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\n--- Inside test_with_print_failing ---"</span><span class="token punctuation">)</span>
+    value <span class="token operator">=</span> <span class="token number">42</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string-interpolation"><span class="token string">f"Current value is: </span><span class="token interpolation"><span class="token punctuation">{</span>value<span class="token punctuation">}</span></span><span class="token string">"</span></span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> value <span class="token operator">==</span> <span class="token number">100</span> <span class="token comment"># This will fail</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"--- This line will not be reached if assert fails ---"</span><span class="token punctuation">)</span>
+
+</code></pre>
+<p><strong>Explanation of <code>tests/test_output_capture.py</code>:</strong></p>
+<ol>
+<li><strong><code>import pytest</code></strong>: Imports the <code>pytest</code> library, though not strictly necessary for this simple example's <code>print</code> behavior, it's good practice for test files.</li>
+<li><strong><code>def test_with_print_passing():</code></strong>:
+<ul>
+<li>This is a simple test function that will always pass.</li>
+<li><code>print("\n--- Inside test_with_print_passing ---")</code>: A <code>print</code> statement at the beginning. The <code>\n</code> adds a newline for better readability in the output.</li>
+<li><code>name = "Alice"</code> and <code>print(f"User's name is: {name}")</code>: Simulates printing some variable's state.</li>
+<li><code>assert True</code>: Ensures the test passes.</li>
+<li><code>print("--- Test test_with_print_passing finished ---")</code>: A <code>print</code> statement at the end.</li>
+</ul>
+</li>
+<li><strong><code>def test_with_print_failing():</code></strong>:
+<ul>
+<li>This test function is designed to fail.</li>
+<li><code>print("\n--- Inside test_with_print_failing ---")</code>: A <code>print</code> statement at the beginning.</li>
+<li><code>value = 42</code> and <code>print(f"Current value is: {value}")</code>: Prints a variable before an assertion.</li>
+<li><code>assert value == 100</code>: This assertion will fail because <code>42</code> is not equal to <code>100</code>.</li>
+<li><code>print("--- This line will not be reached if assert fails ---")</code>: This <code>print</code> statement will not execute because the assertion above it will stop the test.</li>
+</ul>
+</li>
+</ol>
+<p>Now, let's run these tests with and without <code>-s</code>.</p>
+<p><strong>Scenario 1: Running <code>pytest</code> (default capturing)</strong></p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest tests/test_output_capture.py
+</code></pre>
+<p><strong>Expected Output Behavior (Conceptual):</strong></p>
+<ul>
+<li>You will see that <code>test_with_print_passing</code> passes (e.g., a <code>.</code> or its name if you also used <code>-v</code>).</li>
+<li>Crucially, you <strong>will not</strong> see the <code>print</code> statements from <code>test_with_print_passing</code> in the main console output because it passed, and its output was captured and discarded.</li>
+<li>You will see that <code>test_with_print_failing</code> fails (e.g., an <code>F</code>).</li>
+<li><strong>Below the failure report for <code>test_with_print_failing</code></strong>, you will see a section typically labeled <code>Captured stdout call</code> or similar. This section will contain:<pre><code>--- Inside test_with_print_failing ---
+Current value is: 42
+</code></pre>
+This demonstrates <code>pytest</code> showing captured output <em>only</em> for failing tests.</li>
+</ul>
+<p><strong>Scenario 2: Running <code>pytest -s</code> (no capturing)</strong></p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-s</span> tests/test_output_capture.py
+</code></pre>
+<p><strong>Expected Output Behavior (Conceptual):</strong></p>
+<ul>
+<li>As <code>test_with_print_passing</code> executes, you will <strong>immediately</strong> see its <code>print</code> statements in the console:<pre><code>--- Inside test_with_print_passing ---
+User's name is: Alice
+--- Test test_with_print_passing finished ---
+</code></pre>
+</li>
+<li>Then, as <code>test_with_print_failing</code> executes, you will <strong>immediately</strong> see its <code>print</code> statements up to the point of failure:<pre><code>--- Inside test_with_print_failing ---
+Current value is: 42
+</code></pre>
+</li>
+<li>After these <code>print</code> statements, you will see the usual failure traceback for <code>test_with_print_failing</code>. There won't be a separate "Captured stdout call" section for this test because output wasn't captured; it was printed directly.</li>
+</ul>
+<p>This side-by-side comparison clearly illustrates the power of <code>-s</code>. When you're debugging and littering your code with <code>print("Am I here?")</code> or <code>print(f"Variable x = {x}")</code>, <code>-s</code> is essential to see that output in real-time.</p>
+<p><strong>Other Capture Modes (Briefly):</strong></p>
+<p>While <code>-s</code> (which means <code>--capture=no</code>) is the most common way to see <code>print</code> statements, <code>pytest</code> has other capture modes:</p>
+<ul>
+<li><code>--capture=fd</code>: (Default) Captures at the file descriptor (FD) level. Works for most cases.</li>
+<li><code>--capture=sys</code>: Captures by replacing <code>sys.stdout</code> and <code>sys.stderr</code>.</li>
+<li><code>--capture=tee-sys</code>: Captures <code>sys.stdout</code>/<code>stderr</code> but also passes them through to the console. This is useful if you want to see output live <em>and</em> have it captured for the failure report.</li>
+</ul>
+<p>For most day-to-day debugging where you just want to see your prints, <code>-s</code> is the simplest and most effective.</p>
+<h3 id="combining-verbosity-flags" tabindex="-1"><a class="anchor" href="#combining-verbosity-flags" name="combining-verbosity-flags" tabindex="-1"><span class="octicon octicon-link"></span></a>Combining Verbosity Flags</h3>
+<p>You can combine these flags. For instance:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-v</span> <span class="token parameter variable">-s</span>
+</code></pre>
+<p>This command will:</p>
+<ul>
+<li>Run <code>pytest</code> in verbose mode (<code>-v</code>), showing each test name and its status.</li>
+<li>Disable output capturing (<code>-s</code>), so any <code>print()</code> statements from your tests will appear immediately in the console.</li>
+</ul>
+<p>This combination is particularly useful during intensive debugging sessions where you want detailed information about which test is running <em>and</em> any debug prints it produces.</p>
+<h3 id="practical-application-and-summary" tabindex="-1"><a class="anchor" href="#practical-application-and-summary" name="practical-application-and-summary" tabindex="-1"><span class="octicon octicon-link"></span></a>Practical Application and Summary</h3>
+<p>Choosing the right output control flag depends on your current task:</p>
+<ul>
+<li><strong>Standard Test Runs / CI (when things are stable):</strong> Default <code>pytest</code> (no flags or just <code>-v</code> for slightly more detail in CI logs) is often sufficient. The clean output for passing tests and contextual output for failures is generally desirable.</li>
+<li><strong>Understanding Test Flow / Identifying Specific Tests:</strong> Use <code>pytest -v</code>. This helps you see exactly what's running.</li>
+<li><strong>Debugging with <code>print()</code> Statements:</strong> Use <code>pytest -s</code>. This is critical for seeing your debug output immediately. Combine with <code>-v</code> (<code>pytest -v -s</code>) if you also want to see test names alongside your prints.</li>
+<li><strong>Minimalist Output:</strong> Use <code>pytest -q</code> if you only care about the final pass/fail count and want to reduce console noise.</li>
+</ul>
+<p>Mastering these simple flags (<code>-v</code>, <code>-q</code>, <code>-s</code>) significantly enhances your <code>pytest</code> experience. They provide you with the flexibility to get just the right amount of information, streamlining your development and debugging workflows. Remember that the goal of test output is to be informative; these flags let you define what "informative" means for your current context.</p>
+<h2 id="195-stopping-on-first-failure--x" tabindex="-1"><a class="anchor" href="#195-stopping-on-first-failure--x" name="195-stopping-on-first-failure--x" tabindex="-1"><span class="octicon octicon-link"></span></a>19.5 Stopping on First Failure (<code>-x</code>)</h2>
+<p>When you're deep in a development or debugging session, running your entire test suite can sometimes feel like an exercise in patience, especially if an early test fails. Subsequent tests might also fail, not because they have independent issues, but as a direct consequence of that initial failure. This cascade of red lines in your terminal can be overwhelming and unproductive, forcing you to wait for tests that are doomed to fail anyway. Pytest offers a simple yet powerful solution to this: the <code>-x</code> option, also known as <code>--exitfirst</code>.</p>
+<p><strong>The Core Idea: Fail Fast, Fix Fast</strong></p>
+<p>The <code>-x</code> option instructs <code>pytest</code> to stop the entire test session immediately after the first test failure or error. This "fail fast" approach is incredibly useful for streamlining your development workflow.</p>
+<p><strong>Why is <code>pytest -x</code> so beneficial?</strong></p>
+<ol>
+<li>
+<p><strong>Immediate Feedback:</strong> Instead of waiting for hundreds of tests to complete, you get instant notification of the first problem. This allows you to jump straight into debugging the root cause without delay. Imagine a critical setup step failing – perhaps a database connection isn't established correctly in a fixture. All tests relying on that setup will subsequently fail. <code>-x</code> stops the noise and points you directly to the initial problem.</p>
+</li>
+<li>
+<p><strong>Focused Debugging:</strong> By halting on the first failure, <code>pytest -x</code> helps you concentrate your efforts on a single issue. This prevents the cognitive overload of trying to decipher multiple, potentially related, error messages. You fix one bug, re-run, and if another appears, you tackle that next. This iterative process is often more efficient.</p>
+</li>
+<li>
+<p><strong>Resource Efficiency (Especially Locally):</strong> Running unnecessary tests consumes CPU time and developer time. While in Continuous Integration (CI) environments you might want a full report of all failures, during local development, stopping early saves valuable seconds or even minutes per test run, which accumulate significantly over a day.</p>
+</li>
+<li>
+<p><strong>Preventing Cascading Failures:</strong> As mentioned, an early failure (e.g., in a shared fixture or a fundamental piece of code) can trigger a domino effect, causing many subsequent tests to fail. <code>-x</code> cuts this chain reaction short, making the output cleaner and the actual problem easier to identify.</p>
+</li>
+</ol>
+<p><strong>How <code>pytest -x</code> Works "Under the Hood"</strong></p>
+<p>To understand how <code>-x</code> operates, let's briefly touch upon <code>pytest</code>'s execution flow. When you run <code>pytest</code>, it first collects all test items (functions, methods) it can find. Then, it proceeds to execute them one by one.</p>
+<p>With the <code>-x</code> (or <code>--exitfirst</code>) flag active:</p>
+<ul>
+<li><code>pytest</code> runs each test as usual.</li>
+<li>After each test completes, <code>pytest</code> checks its outcome.</li>
+<li>If a test results in a <strong>FAIL</strong> status (an assertion failed) or an <strong>ERROR</strong> status (an unexpected exception occurred), <code>pytest</code> immediately terminates the entire test session.</li>
+<li>It then reports the results gathered up to that point, highlighting the specific test that caused the premature exit. Any tests that were scheduled to run after the failing one are simply not executed.</li>
+</ul>
+<p>Think of it as <code>pytest</code> having an internal flag that says, "If I encounter any trouble, I stop everything and report back immediately."</p>
+<p><strong>Practical Demonstration</strong></p>
+<p>Let's illustrate this with a concrete example. Suppose we have the following test file:</p>
+<p><code>tests/test_exit_conditions.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_exit_conditions.py</span>
+
+<span class="token keyword">import</span> pytest
+
+<span class="token keyword">def</span> <span class="token function">test_alpha_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_alpha_passes"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_beta_fails_assertion</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_beta_fails_assertion"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token number">1</span> <span class="token operator">==</span> <span class="token number">2</span>  <span class="token comment"># This will fail</span>
+
+<span class="token keyword">def</span> <span class="token function">test_gamma_has_error</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_gamma_has_error"</span><span class="token punctuation">)</span>
+    my_list <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    _ <span class="token operator">=</span> my_list<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token comment"># This will cause an IndexError</span>
+
+<span class="token keyword">def</span> <span class="token function">test_delta_passes_but_unreached</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_delta_passes_but_unreached"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token string">"pytest"</span> <span class="token operator">==</span> <span class="token string">"pytest"</span>
+</code></pre>
+<p>Let's break down this example file:</p>
+<ol>
+<li><code>import pytest</code>: We import <code>pytest</code> itself, though it's not strictly necessary for simple test functions like these, it's good practice.</li>
+<li><code>def test_alpha_passes():</code>: A simple test that will always pass. The <code>print</code> statement is added for clarity in the output to see which tests are run.</li>
+<li><code>def test_beta_fails_assertion():</code>: This test is designed to fail due to an <code>AssertionError</code> because <code>1 == 2</code> is false.</li>
+<li><code>def test_gamma_has_error():</code>: This test will result in an <code>ERROR</code> because it attempts to access an element at an invalid index in an empty list, raising an <code>IndexError</code>.</li>
+<li><code>def test_delta_passes_but_unreached():</code>: Another test that would pass, but we'll see if it gets executed.</li>
+</ol>
+<p><strong>Scenario 1: Running <code>pytest</code> without <code>-x</code></strong></p>
+<p>If we run <code>pytest</code> normally on this file (assuming this is the only test file or we target it specifically):</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest tests/test_exit_conditions.py <span class="token parameter variable">-s</span>
+</code></pre>
+<p><em>(The <code>-s</code> flag is used here to show the output from our <code>print</code> statements.)</em></p>
+<p>The output would look something like this (order of <code>beta</code> and <code>gamma</code> might vary if run in parallel, but sequentially):</p>
+<pre><code>============================= test session starts ==============================
+...
+collected 4 items
+
+tests/test_exit_conditions.py
+Running test_alpha_passes
+.
+Running test_beta_fails_assertion
+F
+Running test_gamma_has_error
+E
+Running test_delta_passes_but_unreached
+.
+=================================== FAILURES ===================================
+_________________________ test_beta_fails_assertion __________________________
+
+    def test_beta_fails_assertion():
+        print("\nRunning test_beta_fails_assertion")
+&gt;       assert 1 == 2  # This will fail
+E       assert 1 == 2
+
+tests/test_exit_conditions.py:8: AssertionError
+==================================== ERRORS ====================================
+___________________________ test_gamma_has_error _____________________________
+
+    def test_gamma_has_error():
+        print("\nRunning test_gamma_has_error")
+        my_list = []
+&gt;       _ = my_list[0] # This will cause an IndexError
+E       IndexError: list index out of range
+
+tests/test_exit_conditions.py:13: IndexError
+=========================== short test summary info ============================
+FAILED tests/test_exit_conditions.py::test_beta_fails_assertion - assert 1 == 2
+ERROR tests/test_exit_conditions.py::test_gamma_has_error - IndexError: lis...
+===================== 2 failed, 2 passed in 0.xxs ======================
+</code></pre>
+<p>Let's analyze this output:</p>
+<ol>
+<li><code>collected 4 items</code>: Pytest found all four tests.</li>
+<li><code>Running test_alpha_passes .</code>: <code>test_alpha_passes</code> ran and passed.</li>
+<li><code>Running test_beta_fails_assertion F</code>: <code>test_beta_fails_assertion</code> ran and failed (F).</li>
+<li><code>Running test_gamma_has_error E</code>: <code>test_gamma_has_error</code> ran and errored (E).</li>
+<li><code>Running test_delta_passes_but_unreached .</code>: <code>test_delta_passes_but_unreached</code> also ran and passed.</li>
+<li>The <code>FAILURES</code> and <code>ERRORS</code> sections provide details on <code>test_beta_fails_assertion</code> and <code>test_gamma_has_error</code>.</li>
+<li><code>2 failed, 2 passed</code>: The summary shows all tests were attempted.</li>
+</ol>
+<p>Notice that even though <code>test_beta_fails_assertion</code> failed, <code>pytest</code> continued to execute <code>test_gamma_has_error</code> and <code>test_delta_passes_but_unreached</code>.</p>
+<p><strong>Scenario 2: Running <code>pytest</code> with <code>-x</code> (or <code>--exitfirst</code>)</strong></p>
+<p>Now, let's run the same tests but with the <code>-x</code> flag:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-x</span> tests/test_exit_conditions.py <span class="token parameter variable">-s</span>
+</code></pre>
+<p>The output will be significantly different:</p>
+<pre><code>============================= test session starts ==============================
+...
+collected 4 items
+
+tests/test_exit_conditions.py
+Running test_alpha_passes
+.
+Running test_beta_fails_assertion
+F
+=================================== FAILURES ===================================
+_________________________ test_beta_fails_assertion __________________________
+
+    def test_beta_fails_assertion():
+        print("\nRunning test_beta_fails_assertion")
+&gt;       assert 1 == 2  # This will fail
+E       assert 1 == 2
+
+tests/test_exit_conditions.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_exit_conditions.py::test_beta_fails_assertion - assert 1 == 2
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============================== 1 failed, 1 passed in 0.xxs ===============================
+</code></pre>
+<p>Let's examine this output carefully:</p>
+<ol>
+<li><code>collected 4 items</code>: Pytest still initially collects all four tests.</li>
+<li><code>Running test_alpha_passes .</code>: <code>test_alpha_passes</code> ran and passed.</li>
+<li><code>Running test_beta_fails_assertion F</code>: <code>test_beta_fails_assertion</code> ran and failed.</li>
+<li><strong>Crucially</strong>: The <code>print</code> statement from <code>test_gamma_has_error</code> ("Running test_gamma_has_error") and <code>test_delta_passes_but_unreached</code> are <strong>not</strong> present. These tests were never executed.</li>
+<li>The <code>FAILURES</code> section shows only the details for <code>test_beta_fails_assertion</code>.</li>
+<li><code>stopping after 1 failures !</code>: This message explicitly tells us why the test session ended prematurely.</li>
+<li><code>1 failed, 1 passed</code>: The summary reflects that only two tests were actually fully run. The other two were skipped due to the <code>-x</code> flag.</li>
+</ol>
+<p>This demonstrates the power of <code>-x</code>: as soon as <code>test_beta_fails_assertion</code> failed, <code>pytest</code> halted execution. We didn't have to wait for <code>test_gamma_has_error</code> or <code>test_delta_passes_but_unreached</code>.</p>
+<p><strong>What if an error occurs first?</strong></p>
+<p>If <code>test_gamma_has_error</code> was positioned before <code>test_beta_fails_assertion</code> in the file (or by some other execution ordering), <code>pytest -x</code> would stop at <code>test_gamma_has_error</code> because an unhandled exception (an ERROR in pytest terms) also triggers the exit.</p>
+<p>Let's reorder for demonstration:
+<code>tests/test_exit_conditions_error_first.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_exit_conditions_error_first.py</span>
+
+<span class="token keyword">import</span> pytest
+
+<span class="token keyword">def</span> <span class="token function">test_alpha_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_alpha_passes"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_gamma_has_error</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token comment"># Moved up</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_gamma_has_error"</span><span class="token punctuation">)</span>
+    my_list <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    _ <span class="token operator">=</span> my_list<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span> <span class="token comment"># This will cause an IndexError</span>
+
+<span class="token keyword">def</span> <span class="token function">test_beta_fails_assertion</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span> <span class="token comment"># Moved down</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_beta_fails_assertion"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token number">1</span> <span class="token operator">==</span> <span class="token number">2</span>
+
+<span class="token keyword">def</span> <span class="token function">test_delta_passes_but_unreached</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">print</span><span class="token punctuation">(</span><span class="token string">"\nRunning test_delta_passes_but_unreached"</span><span class="token punctuation">)</span>
+    <span class="token keyword">assert</span> <span class="token string">"pytest"</span> <span class="token operator">==</span> <span class="token string">"pytest"</span>
+</code></pre>
+<p>Running this with <code>-x</code>:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">-x</span> tests/test_exit_conditions_error_first.py <span class="token parameter variable">-s</span>
+</code></pre>
+<p>Output:</p>
+<pre><code>============================= test session starts ==============================
+...
+collected 4 items
+
+tests/test_exit_conditions_error_first.py
+Running test_alpha_passes
+.
+Running test_gamma_has_error
+E
+==================================== ERRORS ====================================
+___________________________ test_gamma_has_error _____________________________
+
+    def test_gamma_has_error(): # Moved up
+        print("\nRunning test_gamma_has_error")
+        my_list = []
+&gt;       _ = my_list[0] # This will cause an IndexError
+E       IndexError: list index out of range
+
+tests/test_exit_conditions_error_first.py:9: IndexError
+=========================== short test summary info ============================
+ERROR tests/test_exit_conditions_error_first.py::test_gamma_has_error - Ind...
+!!!!!!!!!!!!!!!!!!!! stopping after 1 failures (1 error) !!!!!!!!!!!!!!!!!!!!!
+========================= 1 error, 1 passed in 0.xxs =========================
+</code></pre>
+<p>As expected, <code>pytest</code> stopped after <code>test_gamma_has_error</code> produced an <code>IndexError</code>. <code>test_beta_fails_assertion</code> and <code>test_delta_passes_but_unreached</code> were not run.</p>
+<p><strong>Related Option: <code>--maxfail=N</code></strong></p>
+<p>Pytest also offers a more general option: <code>--maxfail=N</code>. This tells <code>pytest</code> to stop after <code>N</code> failures or errors.
+Using <code>-x</code> or <code>--exitfirst</code> is simply a shortcut for <code>--maxfail=1</code>.</p>
+<p>For example, if you wanted to see the first two failures before stopping, you could use:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--maxfail</span><span class="token operator">=</span><span class="token number">2</span> tests/test_exit_conditions.py <span class="token parameter variable">-s</span>
+</code></pre>
+<p>Running this on our original <code>tests/test_exit_conditions.py</code>:</p>
+<pre><code>============================= test session starts ==============================
+...
+collected 4 items
+
+tests/test_exit_conditions.py
+Running test_alpha_passes
+.
+Running test_beta_fails_assertion
+F
+Running test_gamma_has_error
+E
+=================================== FAILURES ===================================
+_________________________ test_beta_fails_assertion __________________________
+
+    def test_beta_fails_assertion():
+        print("\nRunning test_beta_fails_assertion")
+&gt;       assert 1 == 2  # This will fail
+E       assert 1 == 2
+
+tests/test_exit_conditions.py:8: AssertionError
+==================================== ERRORS ====================================
+___________________________ test_gamma_has_error _____________________________
+
+    def test_gamma_has_error():
+        print("\nRunning test_gamma_has_error")
+        my_list = []
+&gt;       _ = my_list[0] # This will cause an IndexError
+E       IndexError: list index out of range
+
+tests/test_exit_conditions.py:13: IndexError
+!!!!!!!!!!!!!!!!!!!! stopping after 2 failures (1 error) !!!!!!!!!!!!!!!!!!!!!
+================== 2 failed, 1 passed in 0.xxs ===================
+</code></pre>
+<p>Here, <code>pytest</code> stopped after both <code>test_beta_fails_assertion</code> (FAIL) and <code>test_gamma_has_error</code> (ERROR) occurred, because we set <code>--maxfail=2</code>. <code>test_delta_passes_but_unreached</code> was not executed.</p>
+<p><strong>When <em>Not</em> to Use <code>-x</code></strong></p>
+<p>While <code>-x</code> is excellent for focused debugging, there are times when you'll want to avoid it:</p>
+<ol>
+<li><strong>Comprehensive Test Runs:</strong> Before committing code, merging branches, or deploying, you typically want a full report of <em>all</em> test failures. Using <code>-x</code> here would hide other potential issues.</li>
+<li><strong>CI/CD Pipelines (Usually):</strong> In most CI environments, the goal is to gather as much information as possible about the state of the codebase. You'd want to see all failures to understand the breadth of any problems. However, some CI setups might use <code>-x</code> for very early "smoke tests" to quickly fail a build if fundamental functionality is broken, saving CI resources.</li>
+<li><strong>Identifying Multiple Unrelated Bugs:</strong> If you suspect there might be several independent bugs, running the full suite will reveal all of them, allowing you to prioritize or assign them accordingly.</li>
+</ol>
+<p><strong>Practical Application and Best Practices</strong></p>
+<ul>
+<li><strong>Embrace <code>-x</code> during development:</strong> Make <code>-x</code> a common part of your <code>pytest</code> invocation when you're actively writing code or debugging a specific feature. It significantly speeds up the "code-test-debug" cycle.</li>
+<li><strong>Combine with other filters:</strong> <code>-x</code> works well with other <code>pytest</code> options like <code>-k</code> (keyword expression) or <code>-m</code> (marker expression). For example, <code>pytest -k "my_feature" -x</code> will run only tests related to "my_feature" and stop on the first failure among them.</li>
+<li><strong>Remember to run the full suite:</strong> Before you consider your work done, always run the entire test suite <em>without</em> <code>-x</code> to ensure no other regressions have been introduced.</li>
+<li><strong>Consider for critical setup tests:</strong> If you have tests that verify essential setup (like database connectivity, crucial service availability), and these tests run early, a failure here often means many subsequent tests will fail. <code>-x</code> can be particularly helpful in such scenarios to immediately highlight the foundational problem.</li>
+</ul>
+<p>In essence, <code>pytest -x</code> is a tool for efficiency and focus. By stopping the test run at the first sign of trouble, it allows you to address problems more rapidly and with less noise, making you a more productive and, ultimately, more confident developer. It's a simple flag, but its impact on your testing workflow can be profound.</p>
+<h2 id="196-rerunning-only-failed-tests---lf---ff" tabindex="-1"><a class="anchor" href="#196-rerunning-only-failed-tests---lf---ff" name="196-rerunning-only-failed-tests---lf---ff" tabindex="-1"><span class="octicon octicon-link"></span></a>19.6 Rerunning Only Failed Tests (<code>--lf</code>, <code>--ff</code>)</h2>
+<p>When you're deep in a development or debugging session, especially with a large test suite, waiting for all tests to run just to check if your recent fix for a single failing test worked can be a significant drain on your time and focus. This iterative cycle of "fix, test, repeat" benefits immensely from speed. Pytest provides powerful command-line options to streamline this process: <code>--last-failed</code> (aliased as <code>--lf</code>) and <code>--failed-first</code> (aliased as <code>--ff</code>). These tools help you get feedback faster by intelligently re-running only the necessary tests.</p>
+<h3 id="the-challenge-of-iterative-fixing" tabindex="-1"><a class="anchor" href="#the-challenge-of-iterative-fixing" name="the-challenge-of-iterative-fixing" tabindex="-1"><span class="octicon octicon-link"></span></a>The Challenge of Iterative Fixing</h3>
+<p>Imagine you have a test suite with hundreds, or even thousands, of tests. One test fails. You investigate, identify a potential cause, and make a code change. Now, you need to verify your fix. If you run the entire test suite again, you might spend several minutes waiting for all tests to complete, even though you're primarily interested in that one test you just tried to fix. This delay can break your concentration and slow down your development momentum. This is precisely the problem that <code>--lf</code> and <code>--ff</code> aim to solve.</p>
+<h3 id="speeding-up-the-fix-cycle-with---last-failed---lf" tabindex="-1"><a class="anchor" href="#speeding-up-the-fix-cycle-with---last-failed---lf" name="speeding-up-the-fix-cycle-with---last-failed---lf" tabindex="-1"><span class="octicon octicon-link"></span></a>Speeding Up the Fix Cycle with <code>--last-failed</code> (<code>--lf</code>)</h3>
+<p>The <code>--last-failed</code> option (or its shorter alias <code>--lf</code>) is your go-to tool for quickly re-running <em>only</em> the tests that failed during the most recent <code>pytest</code> execution.</p>
+<p><strong>What is <code>--last-failed</code>?</strong></p>
+<p>Its purpose is singular and powerful: to execute only those tests that were marked as 'FAILED' or had 'ERRORS' in the immediately preceding test run. If all tests passed in the last run, <code>--lf</code> will not run any tests.</p>
+<p><strong>How Does It Work? The Magic of Pytest's Memory</strong></p>
+<p>Pytest isn't just executing tests; it's also learning from their outcomes. When tests fail, <code>pytest</code> records their unique identifiers. The <code>--lf</code> option then consults this record to determine which tests to run. This "memory" is managed through a caching mechanism, which we'll touch upon more later. For now, understand that <code>pytest</code> keeps track of failures to enable this targeted re-testing.</p>
+<p><strong>Practical Demonstration: <code>--lf</code> in Action</strong></p>
+<p>Let's illustrate this with a concrete example. Suppose we have the following test file:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_rerun_options.py</span>
+
+<span class="token keyword">import</span> pytest
+
+<span class="token comment"># A global flag to control the outcome of test_one</span>
+SHOULD_TEST_ONE_FAIL <span class="token operator">=</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_one_can_fail</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""This test's success depends on the global flag."""</span>
+    <span class="token keyword">if</span> SHOULD_TEST_ONE_FAIL<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"test_one_can_fail is intentionally failing."</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_two_always_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""This test will always pass."""</span>
+    <span class="token keyword">assert</span> <span class="token number">1</span> <span class="token operator">+</span> <span class="token number">1</span> <span class="token operator">==</span> <span class="token number">2</span>
+
+<span class="token keyword">def</span> <span class="token function">test_three_also_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Another test that will always pass."""</span>
+    <span class="token keyword">assert</span> <span class="token string">"hello"</span><span class="token punctuation">.</span>upper<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token string">"HELLO"</span>
+</code></pre>
+<p>Let's walk through the process:</p>
+<ol>
+<li>
+<p><strong>Initial Run: A Test Fails</strong></p>
+<p>First, ensure <code>SHOULD_TEST_ONE_FAIL</code> is <code>True</code> in <code>tests/test_rerun_options.py</code>. Now, run <code>pytest</code>:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest
+</code></pre>
+<p><em>Expected explanation style:</em></p>
+<p>Let's examine this command and its expected output:</p>
+<ol>
+<li><code>pytest</code>: This is the standard command to discover and run all tests in your project.
+<ul>
+<li><strong>Purpose</strong>: We are executing the entire test suite for the first time (or after changes) to see the current status of all tests.</li>
+<li><strong>Underlying Action</strong>: Pytest will discover <code>tests/test_rerun_options.py</code>, find the three test functions (<code>test_one_can_fail</code>, <code>test_two_always_passes</code>, <code>test_three_also_passes</code>), and execute them.</li>
+<li>Since <code>SHOULD_TEST_ONE_FAIL</code> is <code>True</code>, <code>test_one_can_fail</code> will hit the <code>assert False</code> line.</li>
+</ul>
+</li>
+</ol>
+<p>The output will look something like this (details may vary slightly):</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-..., playwright-..., asyncio-..., anyio-...
+collected 3 items
+
+tests/test_rerun_options.py F..                                          [100%]
+
+=================================== FAILURES ===================================
+_____________________________ test_one_can_fail ______________________________
+
+    def test_one_can_fail():
+        """This test's success depends on the global flag."""
+        if SHOULD_TEST_ONE_FAIL:
+&gt;           assert False, "test_one_can_fail is intentionally failing."
+E           AssertionError: test_one_can_fail is intentionally failing.
+E           assert False
+
+tests/test_rerun_options.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_rerun_options.py::test_one_can_fail - AssertionError: tes...
+========================= 1 failed, 2 passed in 0.XXs ==========================
+</code></pre>
+<p>As expected, <code>test_one_can_fail</code> failed, and the other two passed. Crucially, <code>pytest</code> has now recorded that <code>test_one_can_fail</code> was a failure.</p>
+</li>
+<li>
+<p><strong>Using <code>pytest --lf</code>: Rerunning Only the Failure</strong></p>
+<p>Now, without changing any code yet, let's use the <code>--lf</code> flag:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--lf</span>
+</code></pre>
+<p><em>Expected explanation style:</em></p>
+<ol>
+<li><code>pytest --lf</code>: This command tells <code>pytest</code> to run only the tests that failed in the <em>last</em> execution.
+<ul>
+<li><strong>Purpose</strong>: To quickly re-check the failing tests, perhaps after a debugging session where you <em>think</em> you've found the issue but haven't changed the code yet, or to simply isolate the failure.</li>
+<li><strong>Underlying Action</strong>: Pytest consults its cache of last failed tests. In our case, it finds <code>tests/test_rerun_options.py::test_one_can_fail</code>. It will <em>only</em> execute this test. <code>test_two_always_passes</code> and <code>test_three_also_passes</code> will be skipped because they passed previously.</li>
+</ul>
+</li>
+</ol>
+<p>The output will be much shorter:</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-..., playwright-..., asyncio-..., anyio-...
+collected 1 item
+run-last-failure: rerun previous 1 failure
+
+tests/test_rerun_options.py F                                            [100%]
+
+=================================== FAILURES ===================================
+_____________________________ test_one_can_fail ______________________________
+
+    def test_one_can_fail():
+        """This test's success depends on the global flag."""
+        if SHOULD_TEST_ONE_FAIL:
+&gt;           assert False, "test_one_can_fail is intentionally failing."
+E           AssertionError: test_one_can_fail is intentionally failing.
+E           assert False
+
+tests/test_rerun_options.py:8: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_rerun_options.py::test_one_can_fail - AssertionError: tes...
+============================== 1 failed in 0.XXs ===============================
+</code></pre>
+<p>Notice that <code>pytest</code> "collected 1 item" and the summary shows "1 failed". Only <code>test_one_can_fail</code> was run.</p>
+</li>
+<li>
+<p><strong>"Fixing" the Test</strong></p>
+<p>Now, let's simulate fixing the test. Edit <code>tests/test_rerun_options.py</code> and change the global flag:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_rerun_options.py (modified)</span>
+
+<span class="token keyword">import</span> pytest
+
+<span class="token comment"># "Fix" the test by changing this flag</span>
+SHOULD_TEST_ONE_FAIL <span class="token operator">=</span> <span class="token boolean">False</span> <span class="token comment"># Changed from True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_one_can_fail</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""This test's success depends on the global flag."""</span>
+    <span class="token keyword">if</span> SHOULD_TEST_ONE_FAIL<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"test_one_can_fail is intentionally failing."</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_two_always_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""This test will always pass."""</span>
+    <span class="token keyword">assert</span> <span class="token number">1</span> <span class="token operator">+</span> <span class="token number">1</span> <span class="token operator">==</span> <span class="token number">2</span>
+
+<span class="token keyword">def</span> <span class="token function">test_three_also_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Another test that will always pass."""</span>
+    <span class="token keyword">assert</span> <span class="token string">"hello"</span><span class="token punctuation">.</span>upper<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token string">"HELLO"</span>
+</code></pre>
+<p>We've changed <code>SHOULD_TEST_ONE_FAIL</code> to <code>False</code>.</p>
+</li>
+<li>
+<p><strong>Running <code>pytest --lf</code> Again: Verifying the Fix</strong></p>
+<p>With the "fix" in place, run <code>pytest --lf</code> again:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--lf</span>
+</code></pre>
+<p><em>Expected explanation style:</em></p>
+<ol>
+<li><code>pytest --lf</code>: Again, we instruct <code>pytest</code> to run only the tests that failed in its <em>previous</em> execution.
+<ul>
+<li><strong>Purpose</strong>: To confirm if our code change has fixed the previously failing test(s).</li>
+<li><strong>Underlying Action</strong>: Pytest still remembers that <code>test_one_can_fail</code> was the one that failed in the run <em>before this one</em>. It will execute only <code>test_one_can_fail</code>. Because we changed <code>SHOULD_TEST_ONE_FAIL</code> to <code>False</code>, the <code>if</code> condition will be false, and the test will reach <code>assert True</code>, thus passing.</li>
+</ul>
+</li>
+</ol>
+<p>The output will now show:</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-..., playwright-..., asyncio-..., anyio-...
+collected 1 item
+run-last-failure: rerun previous 1 failure
+
+tests/test_rerun_options.py .                                            [100%]
+
+============================== 1 passed in 0.XXs ===============================
+</code></pre>
+<p>Success! <code>test_one_can_fail</code> passed. Pytest correctly identified it as the last failing test and re-ran only it.</p>
+</li>
+<li>
+<p><strong>Running <code>pytest --lf</code> One More Time: No Failures Left</strong></p>
+<p>What happens if we run <code>pytest --lf</code> again, now that <code>test_one_can_fail</code> passed in the immediately preceding <code>--lf</code> run?</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--lf</span>
+</code></pre>
+<p><em>Expected explanation style:</em></p>
+<ol>
+<li><code>pytest --lf</code>: We are asking <code>pytest</code> to run tests that failed in the <em>last</em> run.
+<ul>
+<li><strong>Purpose</strong>: To see what <code>--lf</code> does when the previous run (which was also an <code>--lf</code> run) had no failures.</li>
+<li><strong>Underlying Action</strong>: Pytest checks its cache. The last run (the one from step 4) resulted in <code>test_one_can_fail</code> passing. So, there were <em>no failures</em> in the last run. Consequently, <code>--lf</code> has no tests to run.</li>
+</ul>
+</li>
+</ol>
+<p>The output will be:</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-..., playwright-..., asyncio-..., anyio-...
+collected 0 items
+run-last-failure: no previously failed tests, not running anything.
+
+============================ no tests ran in 0.XXs =============================
+</code></pre>
+<p>This is key: "no previously failed tests, not running anything." The <code>--lf</code> flag is smart enough to know that if the last batch of "last-failed" tests all passed, its job is done for now.</p>
+</li>
+</ol>
+<p><strong>Why is <code>--lf</code> useful?</strong></p>
+<ul>
+<li><strong>Rapid Feedback:</strong> It provides the quickest possible feedback on whether your fix for a specific test worked, as it avoids running unrelated tests.</li>
+<li><strong>Time Savings:</strong> In large test suites, this can save minutes per iteration, significantly speeding up your debugging and TDD (Test-Driven Development) cycles.</li>
+<li><strong>Focus:</strong> It keeps your attention on the problem at hand by only showing results for the tests you're actively trying to fix.</li>
+</ul>
+<h3 id="ensuring-broader-stability-with---failed-first---ff" tabindex="-1"><a class="anchor" href="#ensuring-broader-stability-with---failed-first---ff" name="ensuring-broader-stability-with---failed-first---ff" tabindex="-1"><span class="octicon octicon-link"></span></a>Ensuring Broader Stability with <code>--failed-first</code> (<code>--ff</code>)</h3>
+<p>While <code>--lf</code> is excellent for focused fixing, sometimes a fix for one test might inadvertently break another. The <code>--failed-first</code> option (or its alias <code>--ff</code>) offers a balance: it runs <em>all</em> tests but prioritizes running the previously failed tests <em>first</em>.</p>
+<p><strong>What is <code>--failed-first</code>?</strong></p>
+<p>Its purpose is to give you quick feedback on your primary fix while still ensuring that your changes haven't caused regressions elsewhere in the test suite. It reorders the test execution so that any tests that failed in the last run are executed before other tests.</p>
+<p><strong>How does it differ from <code>--lf</code>?</strong></p>
+<ul>
+<li><code>--lf</code> is <strong>selective</strong>: it <em>only</em> runs previously failed tests.</li>
+<li><code>--ff</code> is <strong>comprehensive but prioritized</strong>: it runs <em>all</em> tests, but changes the <em>order</em> to run previously failed ones at the beginning.</li>
+</ul>
+<p><strong>Practical Demonstration: <code>--ff</code> in Action</strong></p>
+<p>Let's reset our <code>tests/test_rerun_options.py</code> to make <code>test_one_can_fail</code> fail again:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_rerun_options.py (reset to failing state)</span>
+
+<span class="token keyword">import</span> pytest
+
+SHOULD_TEST_ONE_FAIL <span class="token operator">=</span> <span class="token boolean">True</span> <span class="token comment"># Reset to True to cause a failure</span>
+
+<span class="token keyword">def</span> <span class="token function">test_one_can_fail</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">if</span> SHOULD_TEST_ONE_FAIL<span class="token punctuation">:</span>
+        <span class="token keyword">assert</span> <span class="token boolean">False</span><span class="token punctuation">,</span> <span class="token string">"test_one_can_fail is intentionally failing."</span>
+    <span class="token keyword">assert</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_two_always_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> <span class="token number">1</span> <span class="token operator">+</span> <span class="token number">1</span> <span class="token operator">==</span> <span class="token number">2</span>
+
+<span class="token keyword">def</span> <span class="token function">test_three_also_passes</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token keyword">assert</span> <span class="token string">"hello"</span><span class="token punctuation">.</span>upper<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token string">"HELLO"</span>
+</code></pre>
+<ol>
+<li>
+<p><strong>Initial Run: Establishing a Failure</strong></p>
+<p>Run <code>pytest</code> to establish a failure:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest
+</code></pre>
+<p>This will produce output similar to our first run, showing <code>test_one_can_fail</code> failing and the other two passing. Pytest now remembers <code>test_one_can_fail</code> as a failure.</p>
+</li>
+<li>
+<p><strong>Using <code>pytest --ff</code>: Prioritizing the Failed Test</strong></p>
+<p>Now, run <code>pytest</code> with the <code>--ff</code> flag:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--ff</span>
+</code></pre>
+<p><em>Expected explanation style:</em></p>
+<ol>
+<li><code>pytest --ff</code>: This command instructs <code>pytest</code> to run all tests, but to execute any tests that failed in the last run <em>before</em> executing the tests that previously passed.
+<ul>
+<li><strong>Purpose</strong>: To quickly see if the fix for a known issue worked, while also initiating a full test run to catch any new, unexpected breakages caused by the fix.</li>
+<li><strong>Underlying Action</strong>: Pytest consults its cache for failed tests (<code>test_one_can_fail</code>). It then reorders the execution queue. <code>test_one_can_fail</code> will be run first, followed by <code>test_two_always_passes</code> and <code>test_three_also_passes</code> (or vice-versa, their relative order isn't guaranteed beyond the failed one being first).</li>
+</ul>
+</li>
+</ol>
+<p>The output will show all three tests being run, but you'd typically observe (perhaps by adding print statements or using <code>-v</code> for verbosity) that <code>test_one_can_fail</code> is executed first. The summary will still show 1 failed and 2 passed.</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-..., playwright-..., asyncio-..., anyio-...
+collected 3 items
+run-last-failure: rerun previous 1 failure first
+
+tests/test_rerun_options.py F..                                          [100%]
+
+=================================== FAILURES ===================================
+_____________________________ test_one_can_fail ______________________________
+# ... (failure details as before) ...
+=========================== short test summary info ============================
+FAILED tests/test_rerun_options.py::test_one_can_fail - AssertionError: tes...
+========================= 1 failed, 2 passed in 0.XXs ==========================
+</code></pre>
+<p>The key phrase here is "rerun previous 1 failure first".</p>
+</li>
+<li>
+<p><strong>"Fixing" the Test Again</strong></p>
+<p>Modify <code>tests/test_rerun_options.py</code> to set <code>SHOULD_TEST_ONE_FAIL = False</code>.</p>
+</li>
+<li>
+<p><strong>Running <code>pytest --ff</code> Again: Verifying Fix and Regressions</strong></p>
+<p>Execute <code>pytest --ff</code> once more:</p>
+<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token comment"># THIS_CODE_SNIPPET</span>
+pytest <span class="token parameter variable">--ff</span>
+</code></pre>
+<p><em>Expected explanation style:</em></p>
+<ol>
+<li><code>pytest --ff</code>: We run all tests, prioritizing the one that failed in the run <em>before this one</em>.
+<ul>
+<li><strong>Purpose</strong>: To confirm our fix and ensure no other tests broke.</li>
+<li><strong>Underlying Action</strong>: Pytest remembers <code>test_one_can_fail</code> as the previously failing test. It will run <code>test_one_can_fail</code> first (which will now pass due to our code change), followed by <code>test_two_always_passes</code> and <code>test_three_also_passes</code>.</li>
+</ul>
+</li>
+</ol>
+<p>The output will show all tests passing:</p>
+<pre><code>============================= test session starts ==============================
+platform ... -- Python ...
+plugins: django-..., playwright-..., asyncio-..., anyio-...
+collected 3 items
+run-last-failure: rerun previous 1 failure first
+
+tests/test_rerun_options.py ...                                          [100%]
+
+============================== 3 passed in 0.XXs ===============================
+</code></pre>
+<p>Even though all tests passed, <code>pytest</code> still honored the <code>--ff</code> by running <code>test_one_can_fail</code> (the <em>previously</em> failed test) first. If you were to run <code>pytest --ff</code> again, it would remember that no tests failed in <em>this</em> last run, so the "failed-first" logic might not alter the order significantly, or it might revert to a standard order. The primary benefit is for the run immediately after a failure.</p>
+</li>
+</ol>
+<p><strong>Why is <code>--ff</code> useful?</strong></p>
+<ul>
+<li><strong>Balanced Feedback:</strong> You get immediate confirmation on your specific fix because that test runs first.</li>
+<li><strong>Early Regression Detection:</strong> If your fix inadvertently broke other tests, you'll find out sooner in the test run than if the failed test was run in its usual (potentially later) position.</li>
+<li><strong>Confidence:</strong> It provides more confidence than <code>--lf</code> alone because it still verifies the entire suite.</li>
+</ul>
+<h3 id="under-the-hood-pytests-cache-and-lastfailed" tabindex="-1"><a class="anchor" href="#under-the-hood-pytests-cache-and-lastfailed" name="under-the-hood-pytests-cache-and-lastfailed" tabindex="-1"><span class="octicon octicon-link"></span></a>Under the Hood: Pytest's Cache and <code>lastfailed</code></h3>
+<p>Both <code>--lf</code> and <code>--ff</code> rely on <code>pytest</code>'s caching mechanism. When <code>pytest</code> runs, if there are failures, it stores the node IDs (unique identifiers for each test, like <code>tests/test_rerun_options.py::test_one_can_fail</code>) of these failing tests.</p>
+<p>This information is typically stored in a file within the <code>.pytest_cache</code> directory, which is usually created in your project's root (or the directory from which you run <code>pytest</code>). Specifically, you might find a file named <code>lastfailed</code> inside <code>.pytest_cache/v/cache/lastfailed</code> (the exact path can vary slightly based on <code>pytest</code> version and configuration).</p>
+<pre><code>my_django_project/
+├── .pytest_cache/
+│   └── v/
+│       └── cache/
+│           └── lastfailed  &lt;-- Stores IDs of failed tests
+├── manage.py
+├── my_app/
+├── tests/
+│   └── test_rerun_options.py
+└── pytest.ini
+</code></pre>
+<p>This <code>lastfailed</code> file typically contains a JSON structure mapping test node IDs to <code>true</code>. For example:</p>
+<pre class="language-json" tabindex="0"><code class="language-json"><span class="token punctuation">{</span>
+  <span class="token property">"tests/test_rerun_options.py::test_one_can_fail"</span><span class="token operator">:</span> <span class="token boolean">true</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>You don't need to interact with this file directly. <code>pytest</code> manages it automatically. However, knowing it exists helps you understand:</p>
+<ul>
+<li>Why these features work.</li>
+<li>What happens if you delete <code>.pytest_cache</code> (the "memory" of failed tests is lost, so <code>--lf</code> and <code>--ff</code> will behave as if no tests failed previously until a new failure occurs).</li>
+<li>How this state is persisted between <code>pytest</code> invocations.</li>
+</ul>
+<h3 id="choosing-between---lf-and---ff" tabindex="-1"><a class="anchor" href="#choosing-between---lf-and---ff" name="choosing-between---lf-and---ff" tabindex="-1"><span class="octicon octicon-link"></span></a>Choosing Between <code>--lf</code> and <code>--ff</code></h3>
+<p>The choice between <code>--lf</code> and <code>--ff</code> depends on your immediate goal and confidence level:</p>
+<ul>
+<li>
+<p><strong>Use <code>pytest --lf</code> when:</strong></p>
+<ul>
+<li>You are in a tight debugging loop for one or a few specific tests.</li>
+<li>You want the absolute fastest feedback on whether your targeted fix worked.</li>
+<li>You are reasonably confident that your fix is localized and unlikely to affect other parts of the system (or you plan to run the full suite soon anyway).</li>
+<li>Your test suite is very large, and running all tests is prohibitively slow for quick iterations.</li>
+</ul>
+</li>
+<li>
+<p><strong>Use <code>pytest --ff</code> when:</strong></p>
+<ul>
+<li>You want to verify your fix quickly but also want to ensure it hasn't introduced regressions in other tests.</li>
+<li>You prefer a full test run but want the most critical feedback (on the previous failures) first.</li>
+<li>It's a good default for iterative development once an initial failure is identified.</li>
+</ul>
+</li>
+</ul>
+<p>Think of it this way:</p>
+<ul>
+<li><code>--lf</code>: "Did I fix <em>this specific problem</em>?" (Focus: Speed for the known issue)</li>
+<li><code>--ff</code>: "Did I fix this problem, <em>and did I break anything else obvious</em>?" (Focus: Speed for known issue + initial safety check)</li>
+</ul>
+<h3 id="integrating-into-your-workflow" tabindex="-1"><a class="anchor" href="#integrating-into-your-workflow" name="integrating-into-your-workflow" tabindex="-1"><span class="octicon octicon-link"></span></a>Integrating into Your Workflow</h3>
+<p>These options are particularly valuable in common development workflows:</p>
+<ul>
+<li>
+<p><strong>Test-Driven Development (TDD):</strong></p>
+<ol>
+<li>Write a failing test (Red).</li>
+<li>Write code to make it pass.</li>
+<li>Run <code>pytest --lf</code> to quickly check if the new test (which was the only one failing, as it was new) now passes (Green).</li>
+<li>Refactor, periodically running <code>pytest</code> (or <code>pytest --ff</code> if you had multiple failures) to ensure everything still passes.</li>
+</ol>
+</li>
+<li>
+<p><strong>Debugging:</strong></p>
+<ol>
+<li>A test fails during a regular <code>pytest</code> run.</li>
+<li>You apply a fix.</li>
+<li>Run <code>pytest --lf</code> to see if that specific test now passes. If it does, you might follow up with <code>pytest --ff</code> or a full <code>pytest</code> run to check for broader impact.</li>
+</ol>
+</li>
+</ul>
+<h3 id="important-considerations" tabindex="-1"><a class="anchor" href="#important-considerations" name="important-considerations" tabindex="-1"><span class="octicon octicon-link"></span></a>Important Considerations</h3>
+<ul>
+<li><strong>Cache Dependency:</strong> Both <code>--lf</code> and <code>--ff</code> depend on the <code>.pytest_cache</code> directory. If you delete this directory (e.g., as part of a <code>git clean</code> operation) or if you're running tests in a pristine environment (like a fresh CI job), <code>pytest</code> will have no record of previous failures. In such cases:
+<ul>
+<li><code>--lf</code> will report "no previously failed tests, not running anything."</li>
+<li><code>--ff</code> will run all tests in their default order, as there are no "failed-first" candidates.</li>
+</ul>
+</li>
+<li><strong>New Tests and <code>--lf</code>:</strong> If you use <code>pytest --lf</code> and all previously failing tests now pass, <code>pytest --lf</code> will state that no tests ran. It will <em>not</em> automatically pick up any <em>newly written</em> tests that haven't been run (and failed) yet. You'll need to perform a full <code>pytest</code> run (without <code>--lf</code>) to include new tests in the "last failed" tracking if they happen to fail.</li>
+<li><strong>Clearing the Cache for a Fresh Start:</strong> If you want to ensure <code>pytest</code> "forgets" all previous failures and doesn't use the <code>--lf</code> or <code>--ff</code> history (perhaps for a definitive clean run), you can manually delete the <code>.pytest_cache</code> directory. However, simply running <code>pytest</code> without these flags usually suffices to run all tests regardless of past failure history. The flags <code>--cache-clear</code> can also be used before a run to clear all cache contents, including <code>lastfailed</code>.</li>
+</ul>
+<h3 id="summary-efficient-retesting-strategies" tabindex="-1"><a class="anchor" href="#summary-efficient-retesting-strategies" name="summary-efficient-retesting-strategies" tabindex="-1"><span class="octicon octicon-link"></span></a>Summary: Efficient Retesting Strategies</h3>
+<p>The <code>--last-failed</code> (<code>--lf</code>) and <code>--failed-first</code> (<code>--ff</code>) options are indispensable tools in your <code>pytest</code> arsenal for Django testing. They transform the potentially tedious cycle of fixing failing tests into a much more efficient and focused process.</p>
+<ul>
+<li><code>--lf</code> provides lightning-fast feedback on specific fixes.</li>
+<li><code>--ff</code> offers a balance, giving quick feedback on fixes while initiating a broader check for regressions.</li>
+</ul>
+<p>By understanding how they work and when to use each, you can significantly reduce the time spent waiting for test suites to complete, allowing you to iterate faster, maintain focus, and ultimately build more robust Django applications with greater confidence. These simple flags are a testament to <code>pytest</code>'s design philosophy of enhancing developer productivity.</p>
+</div></div><script>
+document.addEventListener('DOMContentLoaded', function() {
+  const preTags = document.querySelectorAll('pre');
+  
+  preTags.forEach(function(pre) {
+    const existingContainer = pre.closest('.pre-container');
+    if (existingContainer) {
+      // If pre is already in a container (e.g. script ran multiple times or manual structure)
+      // Ensure button is there or add it. For simplicity, we assume if container exists, button might too.
+      // A more robust check would be to see if a .copy-btn already exists for this pre.
+      // For now, let's prevent adding duplicate buttons if script re-runs on dynamic content.
+      if (existingContainer.querySelector('.copy-btn')) {
+          return; // Skip if button already there
+      }
+    }
+
+    const container = document.createElement('div');
+    container.className = 'pre-container';
+    
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'Copy';
+    copyBtn.className = 'copy-btn';
+    
+    copyBtn.addEventListener('click', function() {
+      const textToCopy = pre.innerText || pre.textContent; // .innerText is often better for user-visible text
+      navigator.clipboard.writeText(textToCopy).then(
+        function() {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          copyBtn.classList.remove('failed');
+          
+          setTimeout(function() {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        },
+        function() {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Failed!';
+          copyBtn.classList.add('failed');
+          copyBtn.classList.remove('copied');
+          
+          setTimeout(function() {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('failed');
+          }, 2000);
+        }
+      );
+    });
+    
+    // Structure: parent -> container -> pre & button
+    if (pre.parentNode) {
+        pre.parentNode.insertBefore(container, pre);
+    }
+    container.appendChild(pre); // Move pre into container
+    container.appendChild(copyBtn); // Add button to container
+  });
+});
+</script></body></html>

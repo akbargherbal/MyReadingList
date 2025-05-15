@@ -1,0 +1,1122 @@
+<html><head><meta content="light dark" name="color-scheme"/><link href="../style/icons/default/16x16.png" rel="icon"/><link href="../style/themes/github-dark.css" id="_theme" rel="stylesheet" type="text/css"/><link href="../style/vendor/prism-okaidia.min.css" id="_prism" rel="stylesheet" type="text/css"/><link defer="" href="../style/style.css" rel="stylesheet"/><style>
+.pre-container {
+    position: relative;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    background-color: #800000; /* Maroon */
+    color: white;
+    border: 1px solid #5c0000; /* Darker maroon */
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.copy-btn:hover {
+    background-color: #a00000; /* Lighter maroon on hover */
+}
+
+.copy-btn.copied {
+    background-color: #006400; /* Dark Green */
+    border-color: #004d00;
+    color: white;
+}
+
+.copy-btn.failed {
+    background-color: #dc3545; /* Red */
+    border-color: #c82333;
+    color: white;
+}
+</style></head><body class="_theme-github _color-light"><div class="markdown-body" id="_html" style="visibility: visible;"><div class="akbar_container"><h1 id="chapter-3-the-testing-pyramid-in-django" tabindex="-1"><a class="anchor" href="#chapter-3-the-testing-pyramid-in-django" name="chapter-3-the-testing-pyramid-in-django" tabindex="-1"><span class="octicon octicon-link"></span></a>Chapter 3: The Testing Pyramid in Django</h1>
+<h2 id="31-unit-tests-small-fast-isolated" tabindex="-1"><a class="anchor" href="#31-unit-tests-small-fast-isolated" name="31-unit-tests-small-fast-isolated" tabindex="-1"><span class="octicon octicon-link"></span></a>3.1 Unit Tests: Small, Fast, Isolated</h2>
+<p>At the very foundation of the Testing Pyramid lie <strong>Unit Tests</strong>. As the name suggests, a unit test focuses on the smallest "unit" of code that can be logically isolated in a system. This unit is typically a single function, a method within a class, or sometimes an entire class, but the key is its limited scope.</p>
+<p>The three defining characteristics of effective unit tests are:</p>
+<ol>
+<li><strong>Small:</strong> Each unit test verifies a tiny piece of functionality. It has a narrow focus, making it easy to understand what is being tested and why. If a unit test fails, you should have a very good idea of where the problem lies without extensive debugging.</li>
+<li><strong>Fast:</strong> Unit tests should execute very quickly – ideally, hundreds or even thousands in a few seconds. This speed is crucial because it allows developers to run them frequently (e.g., before every commit, or even after every few code changes) without disrupting their workflow. Fast feedback loops are essential for agile development and catching regressions early.</li>
+<li><strong>Isolated:</strong> This is perhaps the most critical characteristic. Unit tests should operate in isolation from other parts of the system and external dependencies. This means:
+<ul>
+<li>They generally do not interact with a database.</li>
+<li>They do not make network requests.</li>
+<li>They do not rely on the file system (unless that's the specific unit being tested).</li>
+<li>They do not depend on other units behaving correctly (dependencies are often "mocked" or "stubbed" – concepts we'll explore later).</li>
+</ul>
+</li>
+</ol>
+<p><strong>Why is isolation so important?</strong>
+Imagine a complex machine with many interconnected gears. If the machine malfunctions, how do you find the faulty gear? If you can test each gear individually, in isolation, you can quickly pinpoint the one that's not working. Unit tests do this for your code. When a unit test fails, because it's isolated, you know the bug is within that specific unit of code, not somewhere else in the system or in an external service. This dramatically reduces debugging time.</p>
+<p>Furthermore, isolation ensures test reliability. If tests depend on external factors (like a network connection or a specific database state), they can fail for reasons unrelated to the code they are supposed to be testing. These are known as "flaky" tests, and they erode confidence in your test suite.</p>
+<p>In the context of the Testing Pyramid, unit tests form the broad base. You'll typically write many more unit tests than integration or end-to-end tests. They are your first line of defense against bugs, providing a solid foundation of correctness for individual components.</p>
+<p><strong>Benefits of Unit Tests:</strong></p>
+<ul>
+<li><strong>Early Bug Detection:</strong> Catch bugs at the earliest stage of development, when they are cheapest and easiest to fix.</li>
+<li><strong>Easier Debugging:</strong> Pinpoint the source of errors quickly due to their isolated nature.</li>
+<li><strong>Confidence in Refactoring:</strong> Allow you to change and improve your code with confidence, knowing that if you break something, a unit test will likely catch it.</li>
+<li><strong>Living Documentation:</strong> Well-written unit tests serve as examples of how to use a particular piece of code and what its expected behavior is.</li>
+<li><strong>Improved Design:</strong> Writing testable code often leads to better, more modular, and loosely coupled designs. If a piece of code is hard to unit test, it's often a sign that its design could be improved.</li>
+</ul>
+<h3 id="311-what-to-unit-test-models-forms-utils" tabindex="-1"><a class="anchor" href="#311-what-to-unit-test-models-forms-utils" name="311-what-to-unit-test-models-forms-utils" tabindex="-1"><span class="octicon octicon-link"></span></a>3.1.1 What to Unit Test (Models, Forms, Utils)</h3>
+<p>The guiding principle for deciding what to unit test is to focus on components that encapsulate <strong>business logic, algorithms, or specific behavioral rules</strong>. You're not trying to test the Django framework itself, but rather <em>your</em> custom code that builds upon it.</p>
+<p>Here are common Django components that are prime candidates for unit testing:</p>
+<ol>
+<li>
+<p><strong>Models (specifically, custom methods and properties):</strong></p>
+<ul>
+<li><strong>What:</strong> Any custom methods you add to your Django model classes (e.g., <code>user.get_full_name()</code>, <code>order.calculate_total()</code>, <code>article.is_published_recently()</code>). Also, <code>@property</code> decorated methods that compute values.</li>
+<li><strong>Why:</strong> Models often contain core business logic related to your data. For instance, a method that determines if a product is eligible for a discount based on certain criteria is pure business logic. Testing these methods directly ensures that your data objects behave as expected under various conditions. You want to verify that these pieces of logic are correct independently of how they might be used by a view or a form.</li>
+<li><strong>Example:</strong> If a <code>Subscription</code> model has an <code>is_active()</code> method that checks its <code>start_date</code> and <code>end_date</code>, you'd unit test this method with various date combinations.</li>
+</ul>
+</li>
+<li>
+<p><strong>Forms (validation and processing logic):</strong></p>
+<ul>
+<li><strong>What:</strong>
+<ul>
+<li><code>is_valid()</code>: Test with both valid and invalid data to ensure it behaves correctly.</li>
+<li>Specific field validation: Check that <code>form.errors['my_field']</code> contains the expected error messages for invalid input.</li>
+<li>Custom <code>clean_&lt;fieldname&gt;()</code> methods: These often contain critical validation logic for individual fields.</li>
+<li>The general <code>clean()</code> method: This is used for cross-field validation, another important area for unit tests.</li>
+<li>Custom <code>save()</code> methods: If your form's <code>save()</code> method does more than just call the model's <code>save()</code> (e.g., sends an email, updates related objects), that extra logic should be unit tested.</li>
+</ul>
+</li>
+<li><strong>Why:</strong> Forms are the gatekeepers of data entering your system. Robustly testing their validation logic ensures data integrity and a good user experience by providing clear feedback on errors. Unit testing form validation is much faster and more precise than trying to test it through UI interactions.</li>
+</ul>
+</li>
+<li>
+<p><strong>Utility Functions/Modules (Utils) and Service Layers:</strong></p>
+<ul>
+<li><strong>What:</strong> Any standalone Python functions, classes, or modules that perform specific tasks. This could include data transformation functions, complex calculation engines, custom template tags or filters (the logic part, not the rendering), or service classes that orchestrate more complex operations.</li>
+<li><strong>Why:</strong> These utilities often contain reusable logic that might be used in multiple places in your application. Testing them in isolation ensures their correctness independently of their consumers. If a utility function for, say, generating a unique slug from a title is thoroughly unit tested, you can be confident it works correctly wherever it's used.</li>
+</ul>
+</li>
+</ol>
+<p><strong>What <em>Not</em> to Typically Unit Test (or test with caution):</strong></p>
+<ul>
+<li><strong>Django's built-in functionality:</strong> Don't write tests to check if <code>CharField</code> stores a string or if <code>model_instance.save()</code> saves to the database. The Django developers have already tested this extensively. Your job is to test <em>your</em> code that <em>uses</em> Django's features.</li>
+<li><strong>Trivial Getters/Setters:</strong> If a method simply returns an attribute's value (e.g., <code>def get_title(self): return self.title</code>), it usually doesn't need its own unit test. The value of such tests is minimal.</li>
+<li><strong>Third-party library code:</strong> You should test your <em>integration</em> with third-party libraries (which often falls into integration testing), but not the internal logic of the libraries themselves. Assume they work as advertised.</li>
+</ul>
+<p><strong>Mental Model: The Microscope</strong></p>
+<p>Think of unit testing as placing a single, small component of your application under a microscope. You're not looking at how it fits into the larger machine yet (that's for integration tests). Instead, you're meticulously examining that one component to ensure it's perfectly crafted and functions correctly on its own. If every individual component is sound, the chances of the entire machine working correctly are much higher.</p>
+<p>By focusing on these specific areas, you ensure that the core logic of your Django application is sound, robust, and behaves as intended, forming a strong base for more complex tests.</p>
+<h3 id="312-example-testing-a-model-method" tabindex="-1"><a class="anchor" href="#312-example-testing-a-model-method" name="312-example-testing-a-model-method" tabindex="-1"><span class="octicon octicon-link"></span></a>3.1.2 Example: Testing a Model Method</h3>
+<p>Let's illustrate unit testing with a practical example: testing a custom method on a Django model. Imagine we have a <code>BlogPost</code> model, and we want to add a method <code>is_published_recently()</code> to determine if a blog post was published within the last 7 days.</p>
+<p><strong>1. The Model Definition</strong></p>
+<p>First, let's define our <code>BlogPost</code> model. Create or update your <code>models.py</code> file within one of your Django apps (e.g., <code>blog/models.py</code>):</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># blog/models.py</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> timedelta
+
+<span class="token keyword">class</span> <span class="token class-name">BlogPost</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    content <span class="token operator">=</span> models<span class="token punctuation">.</span>TextField<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    published_date <span class="token operator">=</span> models<span class="token punctuation">.</span>DateTimeField<span class="token punctuation">(</span>null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">is_published_recently</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token triple-quoted-string string">"""
+        Returns True if the post was published within the last 7 days.
+        Returns False if it's older, not yet published, or published_date is None.
+        """</span>
+        <span class="token keyword">if</span> <span class="token keyword">not</span> self<span class="token punctuation">.</span>published_date<span class="token punctuation">:</span>
+            <span class="token keyword">return</span> <span class="token boolean">False</span>
+        
+        now <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        seven_days_ago <span class="token operator">=</span> now <span class="token operator">-</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span>
+        
+        <span class="token comment"># The post is recent if it was published after 'seven_days_ago'</span>
+        <span class="token comment"># and not in the future (though our logic implicitly handles future by comparing with 'now')</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>published_date <span class="token operator">&gt;</span> seven_days_ago <span class="token keyword">and</span> self<span class="token punctuation">.</span>published_date <span class="token operator">&lt;=</span> now
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+
+</code></pre>
+<p>Let's examine this model code in detail:</p>
+<ol>
+<li>
+<p><strong>Imports:</strong></p>
+<ul>
+<li><code>from django.db import models</code>: Standard import for Django models.</li>
+<li><code>from django.utils import timezone</code>: Crucial for handling datetimes in a timezone-aware manner. Django projects configured with <code>USE_TZ=True</code> (the default and recommended setting) store datetimes in UTC in the database. <code>timezone.now()</code> provides the current time, aware of the project's timezone settings.</li>
+<li><code>from datetime import timedelta</code>: Python's built-in way to represent a duration, which we use to calculate "7 days ago".</li>
+</ul>
+</li>
+<li>
+<p><strong><code>BlogPost</code> Class:</strong></p>
+<ul>
+<li><code>class BlogPost(models.Model):</code>: Defines a standard Django model inheriting from <code>models.Model</code>.</li>
+<li><code>title = models.CharField(max_length=200)</code>: A field for the post's title.</li>
+<li><code>content = models.TextField()</code>: A field for the main content of the post.</li>
+<li><code>published_date = models.DateTimeField(null=True, blank=True)</code>: A field to store when the post was published.
+<ul>
+<li><code>null=True</code>: Allows this field to be <code>NULL</code> in the database (meaning the post might not be published yet).</li>
+<li><code>blank=True</code>: Allows this field to be blank in forms (relevant for Django admin or model forms).</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code>is_published_recently(self)</code> Method:</strong></p>
+<ul>
+<li>This is the custom method we want to unit test. It's an instance method, so it operates on a specific <code>BlogPost</code> instance (<code>self</code>).</li>
+<li><code>if not self.published_date:</code>: The first check. If <code>published_date</code> is <code>None</code> (or any "falsy" value, though <code>None</code> is the expectation here), the post isn't published, let alone recently. So, it returns <code>False</code>.</li>
+<li><code>now = timezone.now()</code>: Gets the current timezone-aware datetime. This is vital for correct comparisons. Using <code>datetime.datetime.now()</code> without timezone awareness can lead to subtle bugs.</li>
+<li><code>seven_days_ago = now - timedelta(days=7)</code>: Calculates the datetime representing exactly 7 days before the current moment.</li>
+<li><code>return self.published_date &gt; seven_days_ago and self.published_date &lt;= now</code>: This is the core logic.
+<ul>
+<li><code>self.published_date &gt; seven_days_ago</code>: Checks if the post's publication date is <em>after</em> the point in time that was 7 days ago. This means it falls within the last 7 days.</li>
+<li><code>self.published_date &lt;= now</code>: Ensures the publication date is not in the future. While a post "published tomorrow" is technically "after 7 days ago", it's not what we typically mean by "published recently". This also handles the case where <code>published_date</code> might be exactly <code>now</code>.</li>
+<li>The <code>and</code> combines these conditions: a post is recent if it was published in the past, but no more than 7 days ago.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong><code>__str__(self)</code> Method:</strong></p>
+<ul>
+<li>A standard Python method to provide a human-readable string representation of the object, often used in the Django admin.</li>
+</ul>
+</li>
+</ol>
+<p>This method, <code>is_published_recently</code>, contains specific logic (the definition of "recent") that is critical to our application's behavior. It's a perfect candidate for a unit test because its correctness can be verified in isolation, without needing a database or other parts of the Django framework to be actively involved during the test execution itself (beyond model instantiation).</p>
+<p><strong>2. The Test Code</strong></p>
+<p>Now, let's write the unit tests for this method. Conventionally, tests for models in an app named <code>blog</code> would go into <code>blog/tests/test_models.py</code>. If this file doesn't exist, create it.</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># blog/tests/test_models.py</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> timedelta
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">from</span> blog<span class="token punctuation">.</span>models <span class="token keyword">import</span> BlogPost <span class="token comment"># Assuming your app is named 'blog'</span>
+
+<span class="token comment"># Note: We are not using @pytest.mark.django_db here.</span>
+<span class="token comment"># Why? Because our `is_published_recently` method and our tests for it</span>
+<span class="token comment"># only operate on model instances in memory. We instantiate BlogPost</span>
+<span class="token comment"># but we don't save instances to the database (no .save() calls)</span>
+<span class="token comment"># and the method itself doesn't perform any database queries.</span>
+<span class="token comment"># This makes the tests even faster and more isolated.</span>
+<span class="token comment"># If the method *did* require database interaction (e.g., accessing a related field</span>
+<span class="token comment"># that causes a query), then @pytest.mark.django_db would be essential.</span>
+
+<span class="token keyword">def</span> <span class="token function">test_post_published_recently</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Test that a post published 3 days ago is considered recent."""</span>
+    <span class="token comment"># Arrange: Create a BlogPost instance with a recent published_date</span>
+    three_days_ago <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">3</span><span class="token punctuation">)</span>
+    recent_post <span class="token operator">=</span> BlogPost<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Recent Post"</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span>three_days_ago<span class="token punctuation">)</span>
+    
+    <span class="token comment"># Act: Call the method we are testing</span>
+    is_recent <span class="token operator">=</span> recent_post<span class="token punctuation">.</span>is_published_recently<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Assert: Check if the result is True</span>
+    <span class="token keyword">assert</span> is_recent <span class="token keyword">is</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_post_published_long_ago</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Test that a post published 10 days ago is not considered recent."""</span>
+    <span class="token comment"># Arrange</span>
+    ten_days_ago <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">10</span><span class="token punctuation">)</span>
+    old_post <span class="token operator">=</span> BlogPost<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Old Post"</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span>ten_days_ago<span class="token punctuation">)</span>
+    
+    <span class="token comment"># Act</span>
+    is_recent <span class="token operator">=</span> old_post<span class="token punctuation">.</span>is_published_recently<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> is_recent <span class="token keyword">is</span> <span class="token boolean">False</span>
+
+<span class="token keyword">def</span> <span class="token function">test_post_not_yet_published</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Test that a post with no published_date is not considered recent."""</span>
+    <span class="token comment"># Arrange</span>
+    unpublished_post <span class="token operator">=</span> BlogPost<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Unpublished Post"</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span><span class="token boolean">None</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Act</span>
+    is_recent <span class="token operator">=</span> unpublished_post<span class="token punctuation">.</span>is_published_recently<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> is_recent <span class="token keyword">is</span> <span class="token boolean">False</span>
+
+<span class="token keyword">def</span> <span class="token function">test_post_published_exactly_seven_days_ago</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""
+    Test a boundary condition: a post published exactly 7 days ago.
+    According to our logic (self.published_date &gt; seven_days_ago),
+    this should NOT be considered recent.
+    """</span>
+    <span class="token comment"># Arrange</span>
+    exactly_seven_days_ago <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span>
+    <span class="token comment"># To be precise, our logic `&gt;` means it must be *after* this moment.</span>
+    <span class="token comment"># If published_date IS seven_days_ago, it's not &gt; seven_days_ago.</span>
+    boundary_post <span class="token operator">=</span> BlogPost<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Boundary Post"</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span>exactly_seven_days_ago<span class="token punctuation">)</span>
+    
+    <span class="token comment"># Act</span>
+    is_recent <span class="token operator">=</span> boundary_post<span class="token punctuation">.</span>is_published_recently<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> is_recent <span class="token keyword">is</span> <span class="token boolean">False</span> 
+
+<span class="token keyword">def</span> <span class="token function">test_post_published_just_under_seven_days_ago</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""
+    Test a boundary condition: a post published just less than 7 days ago.
+    This SHOULD be considered recent.
+    """</span>
+    <span class="token comment"># Arrange</span>
+    <span class="token comment"># (7 days - 1 second) ago</span>
+    almost_seven_days_ago <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">7</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>seconds<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    boundary_post_recent <span class="token operator">=</span> BlogPost<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Boundary Recent Post"</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span>almost_seven_days_ago<span class="token punctuation">)</span>
+    
+    <span class="token comment"># Act</span>
+    is_recent <span class="token operator">=</span> boundary_post_recent<span class="token punctuation">.</span>is_published_recently<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Assert</span>
+    <span class="token keyword">assert</span> is_recent <span class="token keyword">is</span> <span class="token boolean">True</span>
+
+<span class="token keyword">def</span> <span class="token function">test_post_published_in_future</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token triple-quoted-string string">"""Test that a post with a future published_date is not considered recent."""</span>
+    <span class="token comment"># Arrange</span>
+    tomorrow <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">+</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    future_post <span class="token operator">=</span> BlogPost<span class="token punctuation">(</span>title<span class="token operator">=</span><span class="token string">"Future Post"</span><span class="token punctuation">,</span> published_date<span class="token operator">=</span>tomorrow<span class="token punctuation">)</span>
+    
+    <span class="token comment"># Act</span>
+    is_recent <span class="token operator">=</span> future_post<span class="token punctuation">.</span>is_published_recently<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    
+    <span class="token comment"># Assert: Our logic `self.published_date &lt;= now` handles this.</span>
+    <span class="token keyword">assert</span> is_recent <span class="token keyword">is</span> <span class="token boolean">False</span>
+
+</code></pre>
+<p>Let's break down this test code with meticulous care:</p>
+<ol>
+<li>
+<p><strong>Imports:</strong></p>
+<ul>
+<li><code>import pytest</code>: We're using <code>pytest</code> as our test runner, so we import it, though it's not directly used in these simple test functions (its fixtures and test discovery are implicit).</li>
+<li><code>from datetime import timedelta</code>: Used to manipulate dates and times for setting up our test conditions (e.g., "3 days ago").</li>
+<li><code>from django.utils import timezone</code>: Essential for creating timezone-aware <code>datetime</code> objects, consistent with how Django handles them. This ensures our tests behave correctly regardless of the server's local time zone, especially if <code>USE_TZ=True</code> in Django settings.</li>
+<li><code>from blog.models import BlogPost</code>: We import the model class we intend to test. Ensure <code>blog</code> matches your Django app's name.</li>
+</ul>
+</li>
+<li>
+<p><strong>Comment on <code>@pytest.mark.django_db</code>:</strong></p>
+<ul>
+<li>The comment explicitly explains why <code>@pytest.mark.django_db</code> is <em>not</em> used here. This is a key point for understanding true unit test isolation.</li>
+<li>Our <code>is_published_recently()</code> method, as written, only depends on the <code>published_date</code> attribute of the <code>BlogPost</code> instance and the current time. It doesn't perform any database operations (like fetching related objects or saving the instance).</li>
+<li>When we create <code>BlogPost(...)</code> instances in our tests, these are just in-memory Python objects. They are not saved to any database unless we explicitly call <code>recent_post.save()</code>.</li>
+<li>By avoiding database interaction, these tests run faster and are perfectly isolated from the database state, making them true unit tests for the method's logic.</li>
+</ul>
+</li>
+<li>
+<p><strong>Test Functions (e.g., <code>test_post_published_recently</code>):</strong></p>
+<ul>
+<li><strong>Naming Convention:</strong> <code>pytest</code> discovers test functions by looking for functions prefixed with <code>test_</code>. The names are descriptive, indicating the scenario being tested.</li>
+<li><strong>Docstrings:</strong> Each test has a clear docstring explaining its purpose. This is excellent practice for maintainability.</li>
+<li><strong>AAA Pattern (Arrange, Act, Assert):</strong> Each test function generally follows this structure:
+<ul>
+<li><strong>Arrange:</strong> Set up the necessary preconditions and inputs.
+<ul>
+<li><code>three_days_ago = timezone.now() - timedelta(days=3)</code>: We calculate a <code>datetime</code> object representing three days ago from the current moment. <code>timezone.now()</code> gives us a timezone-aware current time. <code>timedelta(days=3)</code> represents a duration of three days. Subtracting the duration from the current time gives us the target past datetime.</li>
+<li><code>recent_post = BlogPost(title="Recent Post", published_date=three_days_ago)</code>: We create an instance of <code>BlogPost</code> in memory. We provide a <code>title</code> (as it's a required field, though not used by the method under test) and, crucially, set its <code>published_date</code> to our calculated <code>three_days_ago</code>. This object is <em>not</em> saved to the database.</li>
+</ul>
+</li>
+<li><strong>Act:</strong> Execute the unit of code being tested.
+<ul>
+<li><code>is_recent = recent_post.is_published_recently()</code>: We call the method we want to test, <code>is_published_recently()</code>, on our prepared <code>recent_post</code> instance. The return value is stored in <code>is_recent</code>.</li>
+</ul>
+</li>
+<li><strong>Assert:</strong> Verify that the outcome is as expected.
+<ul>
+<li><code>assert is_recent is True</code>: This is the core of the test. <code>pytest</code>'s <code>assert</code> statement checks if the condition is true. If <code>is_recent</code> is not <code>True</code>, the test will fail, and <code>pytest</code> will report the failure. We use <code>is True</code> for clarity when asserting boolean values.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Breakdown of Other Test Cases:</strong></p>
+<ul>
+<li><code>test_post_published_long_ago()</code>:
+<ul>
+<li>Arranges a post published 10 days ago.</li>
+<li>Asserts <code>is_published_recently()</code> returns <code>False</code>. This tests the "older than 7 days" scenario.</li>
+</ul>
+</li>
+<li><code>test_post_not_yet_published()</code>:
+<ul>
+<li>Arranges a post where <code>published_date</code> is <code>None</code>.</li>
+<li>Asserts <code>is_published_recently()</code> returns <code>False</code>. This tests the initial guard clause in our method.</li>
+</ul>
+</li>
+<li><code>test_post_published_exactly_seven_days_ago()</code>:
+<ul>
+<li>This is a <strong>boundary condition test</strong>. It checks the behavior right at the edge of our defined logic (<code>self.published_date &gt; seven_days_ago</code>). If a post was published exactly 7 days ago, it is <em>not</em> strictly "greater than" 7 days ago, so it should return <code>False</code>.</li>
+<li>This kind of precise testing is vital for catching off-by-one errors or misunderstandings in logical conditions.</li>
+</ul>
+</li>
+<li><code>test_post_published_just_under_seven_days_ago()</code>:
+<ul>
+<li>Another boundary condition, testing the other side of the 7-day mark. A post published 6 days, 23 hours, 59 minutes, and 59 seconds ago (i.e., <code>timezone.now() - timedelta(days=7) + timedelta(seconds=1)</code>) <em>should</em> be considered recent.</li>
+<li>This ensures our <code>&gt;</code> comparison works as intended for times very close to, but within, the 7-day window.</li>
+</ul>
+</li>
+<li><code>test_post_published_in_future()</code>:
+<ul>
+<li>Arranges a post with <code>published_date</code> set to tomorrow.</li>
+<li>Asserts <code>is_published_recently()</code> returns <code>False</code>, verifying the <code>self.published_date &lt;= now</code> part of our logic.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p><strong>Why this is a good set of unit tests:</strong></p>
+<ul>
+<li><strong>Focused:</strong> Each test targets a specific aspect or boundary condition of the <code>is_published_recently()</code> method.</li>
+<li><strong>Isolated:</strong> The tests do not depend on a database, network, or other parts of the Django application. They only rely on the <code>BlogPost</code> class definition and Python's <code>datetime</code> module.</li>
+<li><strong>Fast:</strong> Because there's no I/O (like database access), these tests will run extremely quickly.</li>
+<li><strong>Readable:</strong> The AAA pattern and descriptive names/docstrings make the tests easy to understand.</li>
+<li><strong>Maintainable:</strong> If the logic of <code>is_published_recently()</code> changes, these tests will clearly indicate what behavior is now different, and they are easy to update.</li>
+<li><strong>Comprehensive (for this unit):</strong> They cover various scenarios: recent, old, unpublished, and critical boundary conditions around the 7-day mark and future dates.</li>
+</ul>
+<p>To run these tests, you would navigate to your project's root directory (where <code>manage.py</code> is) in your terminal and execute <code>pytest</code>. If your app is named <code>blog</code>, <code>pytest</code> will discover and run the tests in <code>blog/tests/test_models.py</code>.</p>
+<p>This example demonstrates the core principles of unit testing a piece of logic within a Django model. The same approach – arrange, act, assert, with a focus on isolation and boundary conditions – applies when unit testing forms, utility functions, or any other self-contained unit of code in your Django project.</p>
+<h2 id="32-integration-tests-how-pieces-fit-together" tabindex="-1"><a class="anchor" href="#32-integration-tests-how-pieces-fit-together" name="32-integration-tests-how-pieces-fit-together" tabindex="-1"><span class="octicon octicon-link"></span></a>3.2 Integration Tests: How Pieces Fit Together</h2>
+<p>In our journey up the Testing Pyramid, having explored the foundational unit tests in the previous section, we now arrive at the crucial middle layer: <strong>Integration Tests</strong>. If unit tests are about ensuring individual bricks are solid, integration tests are about checking if those bricks mortar together correctly to form a sturdy wall segment.</p>
+<p>The core purpose of integration testing is to verify that different, independently developed components or modules of your Django application function correctly when they interact with each other. While unit tests isolate components to scrutinize their internal logic, integration tests focus on the "seams" or "interfaces" between these components. They answer the question: "Do these parts, which work fine on their own, actually collaborate as expected?"</p>
+<p>Think of it like an orchestra. A unit test might verify that the violinist can play their part perfectly in isolation. An integration test, however, would check if the violin section plays in harmony with the cello section, or if the conductor's cues are correctly interpreted by a group of musicians. It's not about testing the entire orchestra's performance for an audience (that's closer to an End-to-End test), but rather ensuring specific sections can coordinate effectively.</p>
+<p><strong>Why are integration tests vital?</strong>
+Individual components might pass all their unit tests with flying colors, but failures can still occur at their interaction points. Common issues include:</p>
+<ul>
+<li><strong>Mismatched expectations:</strong> One component might produce data in a format that another component doesn't expect.</li>
+<li><strong>Incorrect data flow:</strong> Data might not be passed correctly between modules.</li>
+<li><strong>Side effects:</strong> One component's operation might unintentionally affect another in an adverse way.</li>
+<li><strong>Database interaction issues:</strong> A view might make incorrect assumptions about how data is structured or queried from a model.</li>
+</ul>
+<p>Integration tests in Django typically still operate within the boundaries of your application code, using tools that simulate external interactions (like web requests) rather than relying on actual external systems like a live browser. They are generally slower than unit tests because they involve more parts of the system (e.g., database access, template rendering machinery to some extent), but they are significantly faster and less brittle than full End-to-End tests.</p>
+<p>By testing these interactions, we gain confidence that larger segments of our application are cohesive and robust, bridging the gap between the granular focus of unit tests and the holistic view of E2E tests.</p>
+<h3 id="321-what-to-integrate-views--models-views--forms" tabindex="-1"><a class="anchor" href="#321-what-to-integrate-views--models-views--forms" name="321-what-to-integrate-views--models-views--forms" tabindex="-1"><span class="octicon octicon-link"></span></a>3.2.1 What to Integrate (Views + Models, Views + Forms)</h3>
+<p>In a Django application, several key interaction points are prime candidates for integration testing. The goal is not to test every conceivable combination, but to focus on those interactions that are critical to your application's functionality or are common sources of bugs.</p>
+<p>Here are some of the most common and valuable integrations to test:</p>
+<ol>
+<li>
+<p><strong>Views and Models:</strong></p>
+<ul>
+<li><strong>The Interaction:</strong> This is perhaps the most frequent integration you'll test. Django views often query models to fetch data, process it, and then pass it to a template or return it as an API response. Conversely, views might also create or update model instances based on user input.</li>
+<li><strong>Why Test It?</strong>
+<ul>
+<li>Ensures your view's database queries (via the ORM) are correct and retrieve the intended data.</li>
+<li>Verifies that the view correctly handles data from the model (e.g., formatting, filtering).</li>
+<li>Confirms that data modifications initiated by the view are correctly persisted to the database.</li>
+</ul>
+</li>
+<li><strong>Example Scenario:</strong> A view that displays a list of published blog posts. The integration test would verify that the view queries the <code>Post</code> model for posts marked <code>is_published=True</code> and that these, and only these, posts are included in the response. We'll see a detailed example of this shortly.</li>
+</ul>
+</li>
+<li>
+<p><strong>Views and Forms:</strong></p>
+<ul>
+<li><strong>The Interaction:</strong> Views are responsible for instantiating forms, passing them data (e.g., from a POST request), triggering validation, and then acting based on whether the form is valid.</li>
+<li><strong>Why Test It?</strong>
+<ul>
+<li>Checks that the view correctly handles both valid and invalid form submissions.</li>
+<li>Verifies that form errors are correctly processed by the view and made available (e.g., in the template context for display to the user).</li>
+<li>Ensures that successful form submissions lead to the expected actions (e.g., creating a model instance, redirecting the user, sending an email).</li>
+</ul>
+</li>
+<li><strong>Example Scenario:</strong> A contact form view. An integration test would simulate submitting valid data and check for a redirect and perhaps a success message. Another test would submit invalid data and check that the form is re-rendered with appropriate error messages.</li>
+</ul>
+</li>
+<li>
+<p><strong>Models and Custom Managers/QuerySets:</strong></p>
+<ul>
+<li><strong>The Interaction:</strong> While testing a model method in isolation is a unit test, if that method relies heavily on a custom model manager or a complex QuerySet method to fetch or manipulate related data, testing this interaction can be seen as a small-scale integration test.</li>
+<li><strong>Why Test It?</strong> Ensures that your custom data access logic defined in managers or QuerySets behaves as expected when used by the model.</li>
+<li><strong>Example Scenario:</strong> A <code>Product</code> model with a custom manager method <code>Product.objects.get_top_sellers()</code>. A test would verify that this manager method, when called (perhaps indirectly through a model property or another method), correctly filters and orders products.</li>
+</ul>
+</li>
+<li>
+<p><strong>Services/Utility Functions and Models/ORM:</strong></p>
+<ul>
+<li><strong>The Interaction:</strong> If you have separate service layers or utility functions that encapsulate business logic and interact with Django models or the ORM.</li>
+<li><strong>Why Test It?</strong> Verifies that these services correctly use the ORM to achieve their purpose, ensuring data integrity and correct business rule application.</li>
+<li><strong>Example Scenario:</strong> A <code>BillingService</code> that calculates charges based on <code>Subscription</code> models and creates <code>Invoice</code> model instances.</li>
+</ul>
+</li>
+</ol>
+<p>The key principle is to identify components that have a defined contract or interface between them and then write tests that verify this contract under various conditions. These tests often involve the database, which, as we'll reiterate from Chapter 4, necessitates the use of Django's test database mechanism to ensure isolation and reproducibility. This is typically managed for us by <code>pytest-django</code>.</p>
+<h3 id="322-example-testing-a-views-response-with-db-interaction" tabindex="-1"><a class="anchor" href="#322-example-testing-a-views-response-with-db-interaction" name="322-example-testing-a-views-response-with-db-interaction" tabindex="-1"><span class="octicon octicon-link"></span></a>3.2.2 Example: Testing a View's Response with DB Interaction</h3>
+<p>Let's solidify our understanding of integration tests with a practical example. We'll create a simple Django application with a model and a view, and then write an integration test to verify that the view correctly fetches and displays data from the model.</p>
+<p><strong>Scenario:</strong> We have an application that lists "articles." We want a view that only shows articles marked as "published."</p>
+<p><strong>Step 1: Define the Model</strong></p>
+<p>First, let's define a simple <code>Article</code> model in <code>yourapp/models.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/models.py</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>db <span class="token keyword">import</span> models
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+
+<span class="token keyword">class</span> <span class="token class-name">Article</span><span class="token punctuation">(</span>models<span class="token punctuation">.</span>Model<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    title <span class="token operator">=</span> models<span class="token punctuation">.</span>CharField<span class="token punctuation">(</span>max_length<span class="token operator">=</span><span class="token number">200</span><span class="token punctuation">)</span>
+    content <span class="token operator">=</span> models<span class="token punctuation">.</span>TextField<span class="token punctuation">(</span><span class="token punctuation">)</span>
+    published_date <span class="token operator">=</span> models<span class="token punctuation">.</span>DateTimeField<span class="token punctuation">(</span>blank<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> null<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+    is_published <span class="token operator">=</span> models<span class="token punctuation">.</span>BooleanField<span class="token punctuation">(</span>default<span class="token operator">=</span><span class="token boolean">False</span><span class="token punctuation">)</span>
+
+    <span class="token keyword">def</span> <span class="token function">__str__</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        <span class="token keyword">return</span> self<span class="token punctuation">.</span>title
+
+    <span class="token keyword">def</span> <span class="token function">publish</span><span class="token punctuation">(</span>self<span class="token punctuation">)</span><span class="token punctuation">:</span>
+        self<span class="token punctuation">.</span>published_date <span class="token operator">=</span> timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span>
+        self<span class="token punctuation">.</span>is_published <span class="token operator">=</span> <span class="token boolean">True</span>
+        self<span class="token punctuation">.</span>save<span class="token punctuation">(</span><span class="token punctuation">)</span>
+</code></pre>
+<p>Let's examine this model code:</p>
+<ol>
+<li><strong><code>from django.db import models</code> and <code>from django.utils import timezone</code></strong>: These lines import necessary modules. <code>models</code> is fundamental for defining Django models, and <code>timezone</code> is used for handling date and time information, particularly for setting the <code>published_date</code>.</li>
+<li><strong><code>class Article(models.Model):</code></strong>: This defines our <code>Article</code> model, inheriting from <code>django.db.models.Model</code>, which provides all the ORM (Object-Relational Mapper) capabilities.</li>
+<li><strong>Fields</strong>:
+<ul>
+<li><code>title = models.CharField(max_length=200)</code>: A character field for the article's title, with a maximum length of 200 characters.</li>
+<li><code>content = models.TextField()</code>: A text field for the main content of the article, suitable for longer text.</li>
+<li><code>published_date = models.DateTimeField(blank=True, null=True)</code>: A datetime field to store when the article was published. <code>blank=True</code> allows the field to be empty in forms, and <code>null=True</code> allows the database to store a NULL value if no date is set.</li>
+<li><code>is_published = models.BooleanField(default=False)</code>: A boolean field to indicate whether the article is published. It defaults to <code>False</code>, meaning new articles are unpublished by default.</li>
+</ul>
+</li>
+<li><strong><code>def __str__(self):</code></strong>: This is a standard Python method that Django uses to display a human-readable representation of the object, often used in the Django admin interface. Here, it returns the article's title.</li>
+<li><strong><code>def publish(self):</code></strong>: This is a custom method we've added.
+<ul>
+<li><code>self.published_date = timezone.now()</code>: Sets the <code>published_date</code> to the current time.</li>
+<li><code>self.is_published = True</code>: Marks the article as published.</li>
+<li><code>self.save()</code>: Saves the changes to the database. This method encapsulates the logic for publishing an article.</li>
+</ul>
+</li>
+</ol>
+<p>This model provides the data structure for our articles, including the crucial <code>is_published</code> flag that our view will use.</p>
+<p><strong>Step 2: Define the View</strong></p>
+<p>Now, let's create a view in <code>yourapp/views.py</code> that lists only the published articles:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/views.py</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>shortcuts <span class="token keyword">import</span> render
+<span class="token keyword">from</span> <span class="token punctuation">.</span>models <span class="token keyword">import</span> Article
+
+<span class="token keyword">def</span> <span class="token function">article_list_view</span><span class="token punctuation">(</span>request<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    articles <span class="token operator">=</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span><span class="token builtin">filter</span><span class="token punctuation">(</span>is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span><span class="token punctuation">.</span>order_by<span class="token punctuation">(</span><span class="token string">'-published_date'</span><span class="token punctuation">)</span>
+    context <span class="token operator">=</span> <span class="token punctuation">{</span>
+        <span class="token string">'articles'</span><span class="token punctuation">:</span> articles
+    <span class="token punctuation">}</span>
+    <span class="token keyword">return</span> render<span class="token punctuation">(</span>request<span class="token punctuation">,</span> <span class="token string">'yourapp/article_list.html'</span><span class="token punctuation">,</span> context<span class="token punctuation">)</span>
+</code></pre>
+<p>Let's break down this view:</p>
+<ol>
+<li><strong><code>from django.shortcuts import render</code> and <code>from .models import Article</code></strong>: We import <code>render</code> to help generate an HTTP response by rendering a template, and our <code>Article</code> model to interact with the database.</li>
+<li><strong><code>def article_list_view(request):</code></strong>: This defines our view function. It takes an <code>HttpRequest</code> object (<code>request</code>) as its first parameter.</li>
+<li><strong><code>articles = Article.objects.filter(is_published=True).order_by('-published_date')</code></strong>: This is the core logic for data retrieval.
+<ul>
+<li><code>Article.objects</code>: Accesses the default manager for the <code>Article</code> model, which provides methods for database querying.</li>
+<li><code>.filter(is_published=True)</code>: Filters the articles, selecting only those where the <code>is_published</code> field is <code>True</code>. This is the key part of our view's requirement.</li>
+<li><code>.order_by('-published_date')</code>: Orders the retrieved published articles by their <code>published_date</code> in descending order (most recent first). The <code>-</code> prefix indicates descending order.</li>
+</ul>
+</li>
+<li><strong><code>context = {'articles': articles}</code></strong>: A dictionary <code>context</code> is created. This dictionary will be passed to the template, making the <code>articles</code> QuerySet available within the template.</li>
+<li><strong><code>return render(request, 'yourapp/article_list.html', context)</code></strong>: This function call does three things:
+<ul>
+<li>Takes the original <code>request</code> object.</li>
+<li>Specifies the template to be rendered: <code>'yourapp/article_list.html'</code>. (We won't create this template file for this example, as our test will focus on the context data and status code, not the fully rendered HTML content).</li>
+<li>Passes the <code>context</code> dictionary to the template.</li>
+<li>It returns an <code>HttpResponse</code> object containing the rendered HTML.</li>
+</ul>
+</li>
+</ol>
+<p>This view is designed to interact with the <code>Article</code> model to fetch specific data and prepare it for presentation. This interaction is precisely what we want to test.</p>
+<p><strong>Step 3: Define the URL</strong></p>
+<p>We need a URL to access this view. In <code>yourapp/urls.py</code> (create it if it doesn't exist):</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/urls.py</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>urls <span class="token keyword">import</span> path
+<span class="token keyword">from</span> <span class="token punctuation">.</span> <span class="token keyword">import</span> views
+
+urlpatterns <span class="token operator">=</span> <span class="token punctuation">[</span>
+    path<span class="token punctuation">(</span><span class="token string">'articles/'</span><span class="token punctuation">,</span> views<span class="token punctuation">.</span>article_list_view<span class="token punctuation">,</span> name<span class="token operator">=</span><span class="token string">'article-list'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+<span class="token punctuation">]</span>
+</code></pre>
+<p>And ensure this app's URLs are included in your project's main <code>urls.py</code>:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># project/urls.py (example)</span>
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>contrib <span class="token keyword">import</span> admin
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>urls <span class="token keyword">import</span> path<span class="token punctuation">,</span> include
+
+urlpatterns <span class="token operator">=</span> <span class="token punctuation">[</span>
+    path<span class="token punctuation">(</span><span class="token string">'admin/'</span><span class="token punctuation">,</span> admin<span class="token punctuation">.</span>site<span class="token punctuation">.</span>urls<span class="token punctuation">)</span><span class="token punctuation">,</span>
+    path<span class="token punctuation">(</span><span class="token string">'app/'</span><span class="token punctuation">,</span> include<span class="token punctuation">(</span><span class="token string">'yourapp.urls'</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token comment"># Assuming 'yourapp' is the name of your app</span>
+<span class="token punctuation">]</span>
+</code></pre>
+<p>Let's analyze these URL configuration snippets:</p>
+<ul>
+<li>
+<p><strong><code>yourapp/urls.py</code></strong>:</p>
+<ol>
+<li><code>from django.urls import path</code> and <code>from . import views</code>: Imports necessary components. <code>path</code> is used to define URL patterns, and <code>views</code> imports our view functions from the current application.</li>
+<li><code>urlpatterns = [...]</code>: A list that Django searches to route URLs.</li>
+<li><code>path('articles/', views.article_list_view, name='article-list')</code>: Defines a single URL pattern:
+<ul>
+<li><code>'articles/'</code>: The URL path. When a user navigates to <code>/app/articles/</code> (assuming the app's URLs are prefixed with <code>/app/</code>), this pattern will match.</li>
+<li><code>views.article_list_view</code>: The view function that will be called if the pattern matches.</li>
+<li><code>name='article-list'</code>: A unique name for this URL pattern. This is very useful for reversing URLs in templates and tests, making your code more maintainable.</li>
+</ul>
+</li>
+</ol>
+</li>
+<li>
+<p><strong><code>project/urls.py</code></strong>:</p>
+<ol>
+<li><code>from django.urls import path, include</code>: <code>include</code> is used to incorporate URL patterns from other applications.</li>
+<li><code>path('app/', include('yourapp.urls'))</code>: This line tells Django that any URL starting with <code>app/</code> should be routed to the <code>yourapp.urls</code> module for further processing. This is a standard way to organize URLs in larger Django projects.</li>
+</ol>
+</li>
+</ul>
+<p>With these configurations, a request to <code>/app/articles/</code> will be handled by our <code>article_list_view</code>.</p>
+<p><strong>Step 4: Write the Integration Test</strong></p>
+<p>Now, let's write the test in <code>yourapp/tests/test_views.py</code> (you might need to create the <code>tests</code> directory and the <code>test_views.py</code> file):</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># yourapp/tests/test_views.py</span>
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>urls <span class="token keyword">import</span> reverse
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>utils <span class="token keyword">import</span> timezone
+<span class="token keyword">from</span> datetime <span class="token keyword">import</span> timedelta
+<span class="token keyword">from</span> yourapp<span class="token punctuation">.</span>models <span class="token keyword">import</span> Article <span class="token comment"># Ensure this import matches your app structure</span>
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_article_list_view_shows_only_published_articles</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Create some articles, some published, some not</span>
+    published_article_1 <span class="token operator">=</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span><span class="token string">"Published Article 1"</span><span class="token punctuation">,</span> 
+        content<span class="token operator">=</span><span class="token string">"Content 1"</span><span class="token punctuation">,</span> 
+        is_published<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">,</span> 
+        published_date<span class="token operator">=</span>timezone<span class="token punctuation">.</span>now<span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">-</span> timedelta<span class="token punctuation">(</span>days<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span>
+    <span class="token punctuation">)</span>
+    published_article_2 <span class="token operator">=</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span><span class="token string">"Published Article 2"</span><span class="token punctuation">,</span> 
+        content<span class="token operator">=</span><span class="token string">"Content 2"</span>
+    <span class="token punctuation">)</span>
+    <span class="token comment"># Use the custom publish method for this one</span>
+    published_article_2<span class="token punctuation">.</span>publish<span class="token punctuation">(</span><span class="token punctuation">)</span> 
+    
+    unpublished_article <span class="token operator">=</span> Article<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create<span class="token punctuation">(</span>
+        title<span class="token operator">=</span><span class="token string">"Unpublished Article"</span><span class="token punctuation">,</span> 
+        content<span class="token operator">=</span><span class="token string">"Content 3"</span><span class="token punctuation">,</span> 
+        is_published<span class="token operator">=</span><span class="token boolean">False</span>
+    <span class="token punctuation">)</span>
+
+    <span class="token comment"># Act: Make a GET request to the article list view</span>
+    url <span class="token operator">=</span> reverse<span class="token punctuation">(</span><span class="token string">'article-list'</span><span class="token punctuation">)</span> <span class="token comment"># Assumes 'article-list' is the name in urls.py</span>
+    response <span class="token operator">=</span> client<span class="token punctuation">.</span>get<span class="token punctuation">(</span>url<span class="token punctuation">)</span>
+
+    <span class="token comment"># Assert: Check the response</span>
+    <span class="token keyword">assert</span> response<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span>
+    
+    <span class="token comment"># Check that the 'articles' context variable exists and contains the correct items</span>
+    <span class="token keyword">assert</span> <span class="token string">'articles'</span> <span class="token keyword">in</span> response<span class="token punctuation">.</span>context
+    
+    articles_in_context <span class="token operator">=</span> response<span class="token punctuation">.</span>context<span class="token punctuation">[</span><span class="token string">'articles'</span><span class="token punctuation">]</span>
+    <span class="token keyword">assert</span> <span class="token builtin">len</span><span class="token punctuation">(</span>articles_in_context<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token number">2</span>
+    
+    <span class="token comment"># Verify that only published articles are in the context</span>
+    <span class="token comment"># And that they are in the correct order (most recent first)</span>
+    <span class="token keyword">assert</span> published_article_2 <span class="token keyword">in</span> articles_in_context
+    <span class="token keyword">assert</span> published_article_1 <span class="token keyword">in</span> articles_in_context
+    <span class="token keyword">assert</span> unpublished_article <span class="token keyword">not</span> <span class="token keyword">in</span> articles_in_context
+    
+    <span class="token comment"># Check order (published_article_2 was published more recently or has a more recent date)</span>
+    <span class="token keyword">assert</span> <span class="token builtin">list</span><span class="token punctuation">(</span>articles_in_context<span class="token punctuation">)</span> <span class="token operator">==</span> <span class="token punctuation">[</span>published_article_2<span class="token punctuation">,</span> published_article_1<span class="token punctuation">]</span>
+
+    <span class="token comment"># Optionally, check which template was used (if important)</span>
+    <span class="token comment"># This requires checking response.templates, which is a list of Template objects</span>
+    <span class="token comment"># For simplicity, we'll focus on context here, but you could do:</span>
+    <span class="token comment"># assert any(t.name == 'yourapp/article_list.html' for t in response.templates)</span>
+</code></pre>
+<p>Let's dissect this integration test meticulously:</p>
+<ol>
+<li>
+<p><strong><code>import pytest</code></strong>: Imports the <code>pytest</code> library.</p>
+</li>
+<li>
+<p><strong><code>from django.urls import reverse</code></strong>: Imports <code>reverse</code> to dynamically look up the URL for our view by its name. This is much more robust than hardcoding URLs, as it adapts if you change the URL path in <code>urls.py</code> (as long as the name stays the same).</p>
+</li>
+<li>
+<p><strong><code>from django.utils import timezone</code> and <code>from datetime import timedelta</code></strong>: Used for setting <code>published_date</code> relative to the current time.</p>
+</li>
+<li>
+<p><strong><code>from yourapp.models import Article</code></strong>: Imports our <code>Article</code> model.</p>
+</li>
+<li>
+<p><strong><code>@pytest.mark.django_db</code></strong>: This is a crucial <code>pytest-django</code> marker.</p>
+<ul>
+<li><strong>What it does:</strong> It ensures that this test function has access to a Django database. For each test function marked this way (by default), <code>pytest-django</code> creates a fresh, empty test database, runs migrations, and then tears down the database after the test completes.</li>
+<li><strong>Why it's essential:</strong> Our test needs to create <code>Article</code> objects and our view needs to query them. Without database access and proper setup/teardown, the test would fail or, worse, interfere with other tests or your development database. This marker handles the "magic" of test database isolation we discussed in Chapter 4.</li>
+</ul>
+</li>
+<li>
+<p><strong><code>def test_article_list_view_shows_only_published_articles(client):</code></strong>: Defines our test function.</p>
+<ul>
+<li><code>test_...</code>: Follows <code>pytest</code>'s naming convention for test discovery.</li>
+<li><code>client</code>: This is a fixture provided by <code>pytest-django</code>. It acts like a dummy web browser or an HTTP client that can make requests to your Django application internally, without needing a real web server or network stack. We'll explore the <code>client</code> fixture in detail in Chapter 6. For now, understand it as our tool to "visit" URLs in our Django app.</li>
+</ul>
+</li>
+<li>
+<p><strong>Arrange Phase</strong>:</p>
+<ul>
+<li><code>published_article_1 = Article.objects.create(...)</code>: We use the Django ORM to create an <code>Article</code> instance that is already published and has a <code>published_date</code> set to yesterday.</li>
+<li><code>published_article_2 = Article.objects.create(...)</code>: We create another article, initially unpublished.</li>
+<li><code>published_article_2.publish()</code>: We then call our custom <code>publish()</code> method on this article. This not only sets <code>is_published=True</code> and <code>published_date</code> but also tests that our model method works as expected in conjunction with the view. This is a subtle but good practice – using the model's intended API.</li>
+<li><code>unpublished_article = Article.objects.create(...)</code>: We create an article that is explicitly <code>is_published=False</code>.</li>
+<li><strong>Why this setup?</strong> We need a mix of data to robustly test the view's filtering logic. If we only had published articles, we wouldn't know if the <code>is_published=True</code> filter was actually working.</li>
+</ul>
+</li>
+<li>
+<p><strong>Act Phase</strong>:</p>
+<ul>
+<li><code>url = reverse('article-list')</code>: We get the URL for our <code>article_list_view</code> using its name <code>'article-list'</code>. This makes the test resilient to changes in the actual URL path.</li>
+<li><code>response = client.get(url)</code>: We use the <code>client</code> fixture to perform an HTTP GET request to the obtained URL. The <code>response</code> object returned contains all the information about the server's reply (status code, headers, content, context, etc.).</li>
+</ul>
+</li>
+<li>
+<p><strong>Assert Phase</strong>:</p>
+<ul>
+<li><code>assert response.status_code == 200</code>: We check that the HTTP status code of the response is 200 (OK), indicating the request was successful.</li>
+<li><code>assert 'articles' in response.context</code>: The <code>response.context</code> attribute (available when using <code>client</code> and <code>render</code>) gives us access to the context dictionary passed to the template. We assert that our <code>articles</code> key is present.</li>
+<li><code>articles_in_context = response.context['articles']</code>: We retrieve the list of articles from the context.</li>
+<li><code>assert len(articles_in_context) == 2</code>: We assert that exactly two articles are in the context, as we created two published articles.</li>
+<li><code>assert published_article_2 in articles_in_context</code>: We check that specific published articles are present.</li>
+<li><code>assert published_article_1 in articles_in_context</code>: (Same as above)</li>
+<li><code>assert unpublished_article not in articles_in_context</code>: Crucially, we verify that the unpublished article is <em>not</em> present. This confirms our view's filtering logic.</li>
+<li><code>assert list(articles_in_context) == [published_article_2, published_article_1]</code>: We verify the order. Since <code>published_article_2</code> was published using <code>timezone.now()</code> (via the <code>publish()</code> method) and <code>published_article_1</code> was set to <code>timezone.now() - timedelta(days=1)</code>, <code>published_article_2</code> should appear first due to the <code>order_by('-published_date')</code> in our view. Converting <code>articles_in_context</code> (which is a QuerySet) to a <code>list</code> allows for direct comparison of order.</li>
+<li><strong>Commented out template check</strong>: The comment shows how you <em>could</em> check if a specific template was used. <code>response.templates</code> is a list of <code>django.template.Template</code> objects that were involved in rendering the response. This can be useful but for this specific integration test, verifying the context data is often more direct and less brittle than checking template names.</li>
+</ul>
+</li>
+</ol>
+<p><strong>How this test demonstrates integration:</strong></p>
+<ul>
+<li><strong>View + Model Interaction:</strong> The test directly verifies that the <code>article_list_view</code> correctly queries the <code>Article</code> model (using <code>is_published=True</code> and <code>order_by('-published_date')</code>) and that the data retrieved from the database (via the ORM) is accurately reflected in the <code>response.context</code>.</li>
+<li><strong>Database Involvement:</strong> The <code>@pytest.mark.django_db</code> marker ensures a real (test) database is used. The <code>Article.objects.create()</code> calls interact with this database, and the view's query <code>Article.objects.filter(...).order_by(...)</code> also hits this database. This confirms that the ORM queries generated by the view are valid and produce the correct results.</li>
+<li><strong>URL Routing:</strong> The use of <code>reverse()</code> and <code>client.get(url)</code> implicitly tests that the URL configuration correctly routes the <code>/app/articles/</code> path to the <code>article_list_view</code>.</li>
+</ul>
+<p><strong>Why this approach is effective for integration testing:</strong></p>
+<ul>
+<li><strong>Focus:</strong> It targets the specific interaction between the view's logic and the model's data retrieval capabilities.</li>
+<li><strong>Speed:</strong> It's faster than an End-to-End test because it doesn't involve browser rendering, JavaScript execution, or network latency to a separate server process (the <code>client</code> operates in-process).</li>
+<li><strong>Reliability:</strong> By using the actual Django ORM and a test database, it provides high confidence that the database interaction part of the view works correctly.</li>
+<li><strong>Isolation (compared to E2E):</strong> If this test fails, we know the problem likely lies in the <code>article_list_view</code>, the <code>Article</code> model's interaction with the ORM, or the data setup, rather than in the template rendering, JavaScript, or browser behavior.</li>
+</ul>
+<p>This example illustrates a common pattern for integration tests in Django: set up some data in the test database, use the <code>client</code> to interact with a view, and then assert that the view's response (status code, context, headers, etc.) reflects correct interaction with other components like models or forms. As we progress, you'll see how these foundational concepts are applied and expanded upon.</p>
+<h2 id="33-end-to-end-e2e-tests-the-users-journey" tabindex="-1"><a class="anchor" href="#33-end-to-end-e2e-tests-the-users-journey" name="33-end-to-end-e2e-tests-the-users-journey" tabindex="-1"><span class="octicon octicon-link"></span></a>3.3 End-to-End (E2E) Tests: The User's Journey</h2>
+<p>After exploring unit tests that scrutinize individual components in isolation (Section 3.1) and integration tests that verify the interactions between a few connected parts (Section 3.2), we now ascend to the highest level of the testing pyramid: End-to-End (E2E) tests.</p>
+<p>End-to-End tests, as the name suggests, validate the entire application flow from the user's perspective. Imagine a user sitting down at their computer or picking up their phone and interacting with your Django application. They click buttons, fill out forms, navigate through pages, and expect certain outcomes. E2E tests aim to simulate this complete journey, testing the application as a whole, including the user interface (UI), all backend services, databases, and any external integrations.</p>
+<p>The primary goal of E2E tests is to provide confidence that the entire system works together harmoniously to deliver the intended user experience. They answer the crucial question: "Can a user successfully complete a specific task using our application?" Because they cover such a broad scope, they are invaluable for catching issues that might be missed by more granular tests, especially problems arising from the complex interplay of different system components.</p>
+<p>However, this comprehensive nature comes with trade-offs. E2E tests are typically:</p>
+<ul>
+<li><strong>Slower to run:</strong> Simulating user interactions through a browser or even a full-stack test client takes more time than executing isolated unit tests.</li>
+<li><strong>More complex to write and maintain:</strong> They involve setting up more state, interacting with more components, and can be more prone to flakiness if not carefully designed (e.g., due to UI changes or timing issues).</li>
+<li><strong>More resource-intensive:</strong> They might require a running web server, a dedicated test database, and potentially browser instances.</li>
+</ul>
+<p>Therefore, while E2E tests offer the highest level of confidence regarding overall system functionality, they are used more sparingly than unit or integration tests. The strategy isn't to cover every possible scenario with E2E tests, but to focus them on the most critical paths, as we'll discuss next.</p>
+<h3 id="331-what-to-e2e-test-critical-user-flows-login-signup-core-features" tabindex="-1"><a class="anchor" href="#331-what-to-e2e-test-critical-user-flows-login-signup-core-features" name="331-what-to-e2e-test-critical-user-flows-login-signup-core-features" tabindex="-1"><span class="octicon octicon-link"></span></a>3.3.1 What to E2E Test (Critical User Flows: Login, Signup, Core Features)</h3>
+<p>Given the costs associated with E2E tests (time, complexity, resources), a pragmatic approach is essential. We don't aim for 100% E2E test coverage of every feature; that would be inefficient and lead to a slow, brittle test suite. Instead, we strategically select <strong>critical user flows</strong> for E2E testing.</p>
+<p><strong>What constitutes a "critical user flow"?</strong>
+A critical user flow is a sequence of actions a user performs within your application that is fundamental to its core purpose or key business objectives. If one of these flows breaks, it would significantly impair the user's ability to derive value from your application, or it could directly impact your operational goals (e.g., revenue, user acquisition).</p>
+<p>Think about it from a risk perspective: which parts of your application failing would cause the most significant problems for your users or your business? These are prime candidates for E2E tests.</p>
+<p>Here are common examples of critical user flows that often warrant E2E testing:</p>
+<ol>
+<li>
+<p><strong>User Authentication:</strong></p>
+<ul>
+<li><strong>Signup/Registration:</strong> Can a new user successfully create an account? This is often the first interaction a user has with your application.</li>
+<li><strong>Login:</strong> Can an existing user log in successfully? Access to most features usually depends on this.</li>
+<li><strong>Logout:</strong> Can a user securely end their session?</li>
+<li><strong>Password Reset:</strong> Can a user who has forgotten their password regain access to their account?</li>
+</ul>
+</li>
+<li>
+<p><strong>Core Application Features:</strong> These are specific to your application's domain.</p>
+<ul>
+<li>For an e-commerce site: Adding an item to the cart, proceeding through checkout, and completing a purchase.</li>
+<li>For a blogging platform: Creating a new post, publishing it, and viewing it.</li>
+<li>For a project management tool: Creating a new project, adding a task, and assigning it to a user.</li>
+<li>For a social media application: Posting an update, liking a post, sending a message.</li>
+</ul>
+</li>
+<li>
+<p><strong>Key Data Submission/Retrieval Paths:</strong></p>
+<ul>
+<li>Submitting important forms (e.g., a contact form, a support ticket, a complex configuration).</li>
+<li>Viewing critical dashboards or reports.</li>
+</ul>
+</li>
+</ol>
+<p><strong>The "Happy Path" Focus:</strong>
+For E2E tests, the primary focus is usually on the "happy path" – the most common, successful scenario for a given flow. For instance, for a login flow, the happy path E2E test would verify that a user with valid credentials can log in. While error conditions (e.g., invalid password) are important, they are often more efficiently tested at the unit or integration level (e.g., testing form validation logic or view error handling). This helps keep E2E tests more focused and less brittle.</p>
+<p><strong>Why this selective approach?</strong>
+The rationale is rooted in the Testing Pyramid (which we're currently exploring). Unit tests form the broad base, providing fast feedback on individual components. Integration tests sit in the middle, checking collaborations. E2E tests are at the narrow peak, used judiciously for the most crucial end-to-end validations. By focusing E2E tests on critical flows, you gain maximum confidence in the system's overall health with a manageable investment in test development and maintenance. You're essentially ensuring that the main highways of your application are clear and functional.</p>
+<p>In the next section, we'll look at a practical example of how to simulate one of these critical flows: user login.</p>
+<h3 id="332-example-simulating-a-user-login" tabindex="-1"><a class="anchor" href="#332-example-simulating-a-user-login" name="332-example-simulating-a-user-login" tabindex="-1"><span class="octicon octicon-link"></span></a>3.3.2 Example: Simulating a User Login</h3>
+<p>Let's illustrate an E2E test concept by simulating a user login flow. For this example, we'll use <code>pytest-django</code>'s built-in <code>client</code> fixture. While this <code>client</code> doesn't drive a real web browser (we'll cover browser automation with Playwright in Part 3), it allows us to make HTTP requests to our Django application and inspect responses, effectively testing the entire Django stack (URL routing, middleware, views, forms, templates, database interactions) from an "outside-in" perspective. This provides a significant level of confidence in the backend processing of a user journey.</p>
+<p>Imagine we have a standard Django application with user authentication set up. We'll assume:</p>
+<ul>
+<li>You have <code>django.contrib.auth</code> configured.</li>
+<li>You have a login URL named <code>'login'</code>.</li>
+<li>Successful login redirects users to a dashboard URL named <code>'dashboard'</code>.</li>
+<li>The dashboard page requires authentication.</li>
+</ul>
+<p>Here's how we might write a test for the login flow:</p>
+<pre class="language-python" tabindex="0"><code class="language-python"><span class="token comment"># THIS_CODE_SNIPPET</span>
+<span class="token comment"># tests/test_e2e_auth.py</span>
+
+<span class="token keyword">import</span> pytest
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>contrib<span class="token punctuation">.</span>auth<span class="token punctuation">.</span>models <span class="token keyword">import</span> User
+<span class="token keyword">from</span> django<span class="token punctuation">.</span>urls <span class="token keyword">import</span> reverse
+
+<span class="token decorator annotation punctuation">@pytest<span class="token punctuation">.</span>mark<span class="token punctuation">.</span>django_db</span>
+<span class="token keyword">def</span> <span class="token function">test_user_login_flow</span><span class="token punctuation">(</span>client<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    <span class="token comment"># Arrange: Create a user and define credentials</span>
+    username <span class="token operator">=</span> <span class="token string">"testuser"</span>
+    password <span class="token operator">=</span> <span class="token string">"testpassword123"</span>
+    User<span class="token punctuation">.</span>objects<span class="token punctuation">.</span>create_user<span class="token punctuation">(</span>username<span class="token operator">=</span>username<span class="token punctuation">,</span> password<span class="token operator">=</span>password<span class="token punctuation">)</span>
+
+    login_url <span class="token operator">=</span> reverse<span class="token punctuation">(</span><span class="token string">'login'</span><span class="token punctuation">)</span>
+    dashboard_url <span class="token operator">=</span> reverse<span class="token punctuation">(</span><span class="token string">'dashboard'</span><span class="token punctuation">)</span> <span class="token comment"># Assuming this is the redirect target</span>
+
+    <span class="token comment"># Act: Attempt to log in by POSTing to the login URL</span>
+    response <span class="token operator">=</span> client<span class="token punctuation">.</span>post<span class="token punctuation">(</span>login_url<span class="token punctuation">,</span> <span class="token punctuation">{</span>
+        <span class="token string">'username'</span><span class="token punctuation">:</span> username<span class="token punctuation">,</span>
+        <span class="token string">'password'</span><span class="token punctuation">:</span> password
+    <span class="token punctuation">}</span><span class="token punctuation">,</span> follow<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span> <span class="token comment"># follow=True automatically follows the redirect</span>
+
+    <span class="token comment"># Assert: Check the outcome of the login attempt</span>
+    <span class="token comment"># 1. After following the redirect, we should be on the dashboard page</span>
+    <span class="token keyword">assert</span> response<span class="token punctuation">.</span>status_code <span class="token operator">==</span> <span class="token number">200</span><span class="token punctuation">,</span> <span class="token string">"Should be on the dashboard page after successful login"</span>
+    <span class="token keyword">assert</span> response<span class="token punctuation">.</span>request<span class="token punctuation">[</span><span class="token string">'PATH_INFO'</span><span class="token punctuation">]</span> <span class="token operator">==</span> dashboard_url<span class="token punctuation">,</span> <span class="token string">"Should be redirected to the dashboard URL"</span>
+
+    <span class="token comment"># 2. The user should be authenticated</span>
+    <span class="token comment"># response.context['user'] is available if the view adds user to context</span>
+    <span class="token comment"># A more direct way is to check wsgi_request.user</span>
+    <span class="token keyword">assert</span> response<span class="token punctuation">.</span>wsgi_request<span class="token punctuation">.</span>user<span class="token punctuation">.</span>is_authenticated<span class="token punctuation">,</span> <span class="token string">"User should be authenticated"</span>
+
+    <span class="token comment"># 3. (Optional) Verify some content on the dashboard page</span>
+    <span class="token comment"># For example, if the dashboard displays the username:</span>
+    <span class="token comment"># assertContains(response, f"Welcome, {username}")</span>
+</code></pre>
+<p>Let's examine this code in detail:</p>
+<ol>
+<li><strong><code>import pytest</code></strong>: This line imports the <code>pytest</code> library, which is our test runner.</li>
+<li><strong><code>from django.contrib.auth.models import User</code></strong>: We import Django's <code>User</code> model to create a test user.
+<ul>
+<li>This is a fundamental Django component for handling user accounts.</li>
+</ul>
+</li>
+<li><strong><code>from django.urls import reverse</code></strong>: We import <code>reverse</code> to dynamically look up URLs by their names.
+<ul>
+<li>This accomplishes URL generation without hardcoding paths, making tests more resilient to URL changes. Using named URLs is a Django best practice.</li>
+</ul>
+</li>
+<li><strong><code>@pytest.mark.django_db</code></strong>: This is a crucial <code>pytest-django</code> marker.
+<ul>
+<li><strong>Purpose</strong>: It ensures that a dedicated, clean test database is set up for this test and torn down afterward. Any database operations (like creating a user or Django's login mechanism interacting with the session table) will use this isolated test database.</li>
+<li><strong>Why it's essential</strong>: It prevents tests from interfering with each other or your development database, ensuring test reliability and repeatability. We delve deeper into the test database in Chapter 4.</li>
+</ul>
+</li>
+<li><strong><code>def test_user_login_flow(client):</code></strong>: This defines our test function.
+<ul>
+<li><code>pytest</code> discovers test functions by looking for names starting with <code>test_</code>.</li>
+<li><code>client</code>: This parameter tells <code>pytest</code> to inject the <code>client</code> fixture provided by <code>pytest-django</code>.
+<ul>
+<li><strong>What is <code>client</code>?</strong> The <code>client</code> acts like a dummy web browser that can make HTTP requests (GET, POST, etc.) to your Django application. It doesn't render HTML or execute JavaScript, but it interacts with your views, forms, and models as if a browser request came in. We'll explore <code>client</code> thoroughly in Chapter 6.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong><code># Arrange: Create a user and define credentials</code></strong>: This section sets up the necessary preconditions for our test.
+<ul>
+<li><code>username = "testuser"</code></li>
+<li><code>password = "testpassword123"</code>: We define the credentials we'll use for the login attempt.</li>
+<li><code>User.objects.create_user(username=username, password=password)</code>: We use the Django ORM to create a new user in the test database. <code>create_user</code> conveniently handles password hashing.
+<ul>
+<li>This ensures a known user exists for our login attempt.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong><code>login_url = reverse('login')</code></strong>: We get the URL for the login page.
+<ul>
+<li>Assuming you have a URL pattern named <code>'login'</code> in your <code>urls.py</code>.</li>
+</ul>
+</li>
+<li><strong><code>dashboard_url = reverse('dashboard')</code></strong>: We get the URL for the dashboard page, which is our expected redirect target after a successful login.</li>
+<li><strong><code># Act: Attempt to log in by POSTing to the login URL</code></strong>: This is where we perform the action we want to test.
+<ul>
+<li><code>response = client.post(login_url, {'username': username, 'password': password}, follow=True)</code>:
+<ul>
+<li><code>client.post()</code>: This method sends an HTTP POST request to the specified <code>login_url</code>.</li>
+<li><code>{'username': username, 'password': password}</code>: This dictionary represents the form data being submitted. Django's login view expects fields typically named 'username' and 'password'.</li>
+<li><code>follow=True</code>: This is a very useful argument. When a POST request results in a redirect (HTTP status code 302, common after successful logins), <code>follow=True</code> tells the <code>client</code> to automatically make a subsequent GET request to the URL specified in the redirect. The <code>response</code> object will then contain the details of this <em>final</em> page, not the initial redirect response. This simplifies testing redirect flows.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong><code># Assert: Check the outcome of the login attempt</code></strong>: Here, we verify that the action had the desired effects.
+<ul>
+<li><code>assert response.status_code == 200, "Should be on the dashboard page after successful login"</code>:
+<ul>
+<li>Since we used <code>follow=True</code>, we expect the final response to be from the dashboard page, which should return an HTTP 200 OK status if the user is successfully logged in and authorized to view it.</li>
+</ul>
+</li>
+<li><code>assert response.request['PATH_INFO'] == dashboard_url, "Should be redirected to the dashboard URL"</code>:
+<ul>
+<li>The <code>response.request</code> attribute is a dictionary containing details about the request that produced the <em>final</em> response. <code>PATH_INFO</code> gives us the path of that request. We assert that this path matches our expected <code>dashboard_url</code>. This confirms the redirect led to the correct page.</li>
+</ul>
+</li>
+<li><code>assert response.wsgi_request.user.is_authenticated, "User should be authenticated"</code>:
+<ul>
+<li><code>response.wsgi_request</code> gives access to the underlying WSGI request object that Django processed for the final page.</li>
+<li><code>user.is_authenticated</code> is a standard Django attribute on the user object that is <code>True</code> if the user has been successfully logged in and authenticated. This is a direct way to confirm the login state.</li>
+</ul>
+</li>
+<li><strong>Optional Assertion (commented out)</strong>: <code>assertContains(response, f"Welcome, {username}")</code>
+<ul>
+<li><code>pytest-django</code> provides <code>assertContains</code> (and <code>assertNotContains</code>) to check if specific content exists in the response body (HTML). This can be useful to verify that the correct page content is rendered, further confirming a successful login and landing on the right page. We'll cover response content assertions in more detail in Chapter 6.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+<p>This test, while not using a real browser, simulates a critical user journey: creating a user, attempting to log in with their credentials, and verifying that they are successfully authenticated and redirected to the appropriate page. It tests the integration of your URL routing, login view logic, authentication backend, session handling, and potentially parts of your dashboard view.</p>
+<p><strong>Why this approach for an "E2E" example now?</strong></p>
+<ul>
+<li><strong>Foundation Building</strong>: It introduces the concept of testing a complete flow through your Django application using tools (<code>client</code>, <code>@pytest.mark.django_db</code>) that are fundamental to <code>pytest-django</code>.</li>
+<li><strong>Incremental Complexity</strong>: It's a step up from unit and basic integration tests without immediately jumping into the complexities of browser automation (which we'll cover extensively in Part 3 with <code>pytest-playwright</code> and the <code>live_server</code>).</li>
+<li><strong>High Value</strong>: Even without a browser, tests like this catch many common issues in critical paths like login, ensuring the backend logic and component integration are sound.</li>
+</ul>
+<p>In a real-world scenario, you would extend this by testing failure cases (e.g., login with incorrect password – though often better as an integration test for the view/form), and then, for full E2E assurance, you'd complement it with browser-based tests (as covered later) to ensure the UI elements for login are also working correctly. This <code>client</code>-based test provides a strong guarantee that the server-side mechanics of the login journey are correct.</p>
+<h2 id="34-balancing-the-pyramid-where-to-focus-your-efforts" tabindex="-1"><a class="anchor" href="#34-balancing-the-pyramid-where-to-focus-your-efforts" name="34-balancing-the-pyramid-where-to-focus-your-efforts" tabindex="-1"><span class="octicon octicon-link"></span></a>3.4 Balancing the Pyramid: Where to Focus Your Efforts</h2>
+<p>Having explored unit, integration, and end-to-end (E2E) tests in the preceding sections (3.1, 3.2, and 3.3), we now arrive at a crucial question: how should you distribute your testing efforts among these different types? The answer is pivotal for creating a test suite that is effective, maintainable, and provides maximum value. The "Testing Pyramid" is a widely adopted conceptual model that offers guidance on structuring your test suite for optimal balance.</p>
+<p>The Testing Pyramid visually represents an ideal distribution of tests. Imagine a pyramid with three layers:</p>
+<ul>
+<li><strong>Base:</strong> Unit Tests (widest layer)</li>
+<li><strong>Middle:</strong> Integration Tests</li>
+<li><strong>Top:</strong> End-to-End Tests (narrowest layer)</li>
+</ul>
+<p>This shape is not arbitrary; it reflects a strategic allocation based on the characteristics, costs, and benefits of each test type. The width of each layer metaphorically suggests the relative <em>quantity</em> of tests you should aim for. Let's dissect <em>why</em> this structure is recommended and how to apply it to your Django projects.</p>
+<p><strong>The "Why" Behind the Pyramid's Shape: Understanding the Trade-offs</strong></p>
+<p>The pyramid model emerges from a careful consideration of several interconnected factors: cost, execution speed, reliability, debugging difficulty, and the scope of feedback.</p>
+<ol>
+<li>
+<p><strong>Cost and Execution Speed:</strong></p>
+<ul>
+<li>
+<p><strong>Unit Tests (Base):</strong> These are the cheapest to write and the fastest to run. They typically execute in milliseconds because they test small, isolated pieces of code without external dependencies like databases or network services (or with these dependencies effectively mocked). Their minimal setup and rapid execution mean you can run them very frequently, even continuously as you code.</p>
+</li>
+<li>
+<p><strong>Integration Tests (Middle):</strong> These are moderately more expensive and slower. They might involve setting up a test database (as <code>pytest-django</code> does automatically), interacting with multiple components, or mocking parts of your system. Each test might take from milliseconds to a few seconds.</p>
+</li>
+<li>
+<p><strong>End-to-End Tests (Top):</strong> These are by far the most expensive to write, maintain, and run. They involve spinning up a real server (like the <code>live_server</code>), launching a browser, and simulating user interactions across the entire application stack. A single E2E test can take several seconds to minutes to complete. A large suite of E2E tests can significantly slow down your feedback loop.</p>
+</li>
+<li>
+<p><strong>The Principle:</strong> The faster the feedback loop, the quicker developers can identify and fix bugs. A test suite dominated by slow tests discourages frequent execution, delaying bug discovery and increasing remediation costs. The pyramid advocates for a large volume of fast tests.</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Reliability and Debugging (Pinpointing Failures):</strong></p>
+<ul>
+<li>
+<p><strong>Unit Tests:</strong> When a unit test fails, it usually points directly to a specific function or method in a small, isolated piece of code. This makes debugging relatively straightforward and quick. They are also highly reliable and less prone to "flakiness" because they have fewer dependencies.</p>
+</li>
+<li>
+<p><strong>Integration Tests:</strong> A failing integration test indicates an issue in the interaction <em>between</em> components. Debugging is more complex than with unit tests, as you need to investigate the contract or communication pathway between the involved parts.</p>
+</li>
+<li>
+<p><strong>E2E Tests:</strong> These are the most challenging to debug. A failure could stem from an issue anywhere in the application: a bug in the frontend JavaScript, a problem in a Django view, an error in a model, a database inconsistency, a network glitch, or even an issue with the test script itself (e.g., a brittle locator). E2E tests are also more susceptible to flakiness – failing intermittently due to timing issues, animations, or other dynamic aspects of a live application.</p>
+</li>
+<li>
+<p><strong>The Principle:</strong> The easier it is to diagnose a failure, the less time is wasted. The pyramid structure favors tests that provide precise feedback, reducing the diagnostic burden. While E2E tests offer broad coverage, their diagnostic precision is low.</p>
+</li>
+</ul>
+</li>
+<li>
+<p><strong>Scope of Feedback and Confidence:</strong></p>
+<ul>
+<li>
+<p><strong>Unit Tests:</strong> Verify that individual building blocks (e.g., a model's custom method, a form's validation rule) work correctly in isolation. They provide confidence that the fundamental logic is sound.</p>
+</li>
+<li>
+<p><strong>Integration Tests:</strong> Verify that different components of your application collaborate as expected. For instance, does a Django view correctly use a model to fetch data and pass it to the right template? This builds confidence that the system's internal wiring is correct.</p>
+</li>
+<li>
+<p><strong>E2E Tests:</strong> Verify complete user workflows from an end-user's perspective, ensuring the entire system functions cohesively to deliver value. A passing E2E suite for critical paths provides the highest level of confidence that the application is working as users would experience it.</p>
+</li>
+<li>
+<p><strong>The Principle:</strong> Different test types provide different kinds of confidence. A balanced pyramid ensures you have confidence at all levels: that individual components are correct, that they integrate properly, and that key user journeys are functional.</p>
+</li>
+</ul>
+</li>
+</ol>
+<p><strong>Strategic Allocation of Testing Effort in Django</strong></p>
+<p>Understanding these trade-offs allows for a more strategic approach to writing tests for your Django application:</p>
+<ol>
+<li>
+<p><strong>Unit Tests: The Broad and Solid Foundation</strong></p>
+<ul>
+<li><strong>Focus:</strong> The bulk of your testing effort should be here. Prioritize unit testing for:
+<ul>
+<li><strong>Model methods and properties:</strong> Custom logic within your <code>models.py</code> (e.g., calculated fields, methods that modify state).</li>
+<li><strong>Form validation and cleaning:</strong> Custom <code>clean_FIELDNAME()</code> or <code>clean()</code> methods in <code>forms.py</code>.</li>
+<li><strong>Utility functions and helper classes:</strong> Any standalone Python logic that supports your application.</li>
+<li><strong>Service layers or business logic modules:</strong> If you separate complex business operations into distinct services.</li>
+<li><strong>Template tags and filters:</strong> The logic within custom template extensions.</li>
+</ul>
+</li>
+<li><strong>Goal:</strong> Achieve high coverage of these individual, often complex, pieces of logic. Ensure each part behaves as expected under various conditions (valid inputs, invalid inputs, edge cases).</li>
+<li><strong>Why:</strong> These tests are fast, stable, and precisely identify failures, making them highly efficient for catching bugs early in the development cycle.</li>
+</ul>
+</li>
+<li>
+<p><strong>Integration Tests: The Connective Tissue</strong></p>
+<ul>
+<li><strong>Focus:</strong> Test the interactions and collaborations between different parts of your Django application. Key areas include:
+<ul>
+<li><strong>Views:</strong> Use the Django test <code>client</code> (as we'll explore in Chapter 6) to test how views respond to requests. This includes:
+<ul>
+<li>Correct template rendering.</li>
+<li>Accurate context data passed to templates.</li>
+<li>Proper handling of form submissions (valid and invalid).</li>
+<li>Correct redirects.</li>
+<li>Database state changes after a request (e.g., an object is created or updated).</li>
+</ul>
+</li>
+<li><strong>Model-View-Form interactions:</strong> Ensure that data flows correctly between these components.</li>
+<li><strong>Signals:</strong> If your application uses Django signals, test that receivers are called and perform their intended actions.</li>
+<li><strong>Custom middleware:</strong> Test that middleware processes requests and responses correctly.</li>
+<li><strong>API Endpoints (if using Django REST framework or similar):</strong> Verify request handling, response data, status codes, and authentication/authorization mechanisms.</li>
+</ul>
+</li>
+<li><strong>Goal:</strong> Ensure that the integrated parts of your application work together seamlessly. These tests catch issues that arise from incorrect assumptions about how components interact.</li>
+<li><strong>Why:</strong> While unit tests verify components in isolation, integration tests ensure they "talk" to each other correctly. They are more complex than unit tests but less brittle and faster than E2E tests.</li>
+</ul>
+</li>
+<li>
+<p><strong>End-to-End Tests: The User's Critical Journey</strong></p>
+<ul>
+<li><strong>Focus:</strong> Reserve E2E tests for the most critical user workflows – those paths through your application that are essential for its core functionality and value proposition. Examples include:
+<ul>
+<li>User registration and login.</li>
+<li>Core feature usage (e.g., creating a new post in a blog, adding an item to a cart in an e-commerce site, submitting a critical form).</li>
+<li>Password recovery.</li>
+</ul>
+</li>
+<li><strong>Goal:</strong> Provide assurance that these vital end-to-end scenarios are working correctly from the user's perspective, in an environment that closely mimics production (using <code>live_server</code> and a real browser via <code>pytest-playwright</code>).</li>
+<li><strong>Why:</strong> These tests are your ultimate "smoke tests" before a deployment. They catch issues that might only manifest when the entire system is running. However, due to their cost and brittleness, they should be used judiciously. The principle of diminishing returns applies strongly here: the value of adding more and more E2E tests decreases rapidly after the most critical paths are covered.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Common Pitfalls: Anti-Patterns in Test Distribution</strong></p>
+<p>Deviating significantly from the pyramid structure often leads to common anti-patterns with negative consequences:</p>
+<ol>
+<li>
+<p><strong>The Inverted Pyramid (or "Ice Cream Cone")</strong></p>
+<ul>
+<li><strong>Description:</strong> A test suite dominated by E2E tests, with few integration tests and even fewer unit tests.</li>
+<li><strong>Problems:</strong>
+<ul>
+<li><strong>Slow Feedback:</strong> The test suite takes a very long time to run, discouraging frequent execution. Developers might push code without running all tests, leading to bugs discovered late or in production.</li>
+<li><strong>High Brittleness &amp; Maintenance:</strong> E2E tests are sensitive to UI changes. Minor cosmetic updates can break many tests, leading to significant maintenance overhead.</li>
+<li><strong>Difficult Debugging:</strong> When an E2E test fails, pinpointing the root cause can be a time-consuming investigation across multiple layers of the application.</li>
+<li><strong>Poor Coverage of Logic:</strong> Underlying business logic and edge cases within individual components may not be adequately tested, as E2E tests typically only cover "happy paths" or a few common scenarios.</li>
+</ul>
+</li>
+<li><strong>Root Cause:</strong> Often stems from a belief that E2E tests are the "most realistic" and therefore the only ones that matter, or a lack of familiarity with effective unit and integration testing techniques.</li>
+</ul>
+</li>
+<li>
+<p><strong>The Hourglass</strong></p>
+<ul>
+<li><strong>Description:</strong> Many unit tests and many E2E tests, but a scarcity of integration tests in the middle.</li>
+<li><strong>Problems:</strong>
+<ul>
+<li><strong>Untested Interactions:</strong> While individual units are verified and high-level user flows are checked, the direct collaborations and contracts between components are not explicitly tested.</li>
+<li><strong>Hidden Integration Bugs:</strong> Subtle bugs can arise from incorrect interactions between well-tested units. These might be missed or only surface erratically in E2E tests, making them hard to diagnose.</li>
+<li><strong>Inefficient Debugging:</strong> E2E test failures caused by integration issues could have been caught earlier, faster, and more cheaply by dedicated integration tests.</li>
+</ul>
+</li>
+<li><strong>Root Cause:</strong> Teams might excel at unit testing individual components and then jump directly to E2E testing for "full system validation," neglecting the crucial intermediate layer where many real-world bugs occur.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Practical Guidance for Django Projects: Building a Balanced Suite</strong></p>
+<ul>
+<li><strong>Start with the Base:</strong> When developing a new Django feature (e.g., a new model with custom logic, a new form), write unit tests for its components <em>first</em>. This ensures the building blocks are solid before you assemble them.</li>
+<li><strong>Integrate Incrementally:</strong> As you create Django views that utilize these models and forms, write integration tests using the <code>client</code>. Verify that the view processes data correctly, interacts with the ORM as expected, and renders the appropriate response or template.</li>
+<li><strong>Be Highly Selective with E2E Tests:</strong> Identify the 2-5 most absolutely critical user flows in your application. These are your prime candidates for E2E tests. For example, if users can't log in or complete a purchase, the application is fundamentally broken. Test these scenarios thoroughly.</li>
+<li><strong>Resist 100% E2E Coverage:</strong> Aiming to cover every possible user interaction and edge case with E2E tests is impractical, inefficient, and leads to an unmaintainable test suite. Focus E2E tests on verifying the <em>happy paths</em> of critical workflows. Use unit and integration tests for edge cases and detailed logic verification.</li>
+<li><strong>Listen to Your Test Suite:</strong> If your E2E tests are frequently failing due to minor UI changes, or if your overall test suite runs too slowly, it's a strong indicator that your pyramid might be imbalanced. Re-evaluate if some of the scenarios covered by slow or brittle E2E tests could be more effectively tested at the integration or unit level.</li>
+</ul>
+<p><strong>Conclusion: The Pyramid as a Heuristic, Not Dogma</strong></p>
+<p>The Testing Pyramid is a powerful mental model and an invaluable guideline for structuring a healthy test suite. It encourages a strategic approach that maximizes feedback speed, minimizes costs, and improves the reliability and maintainability of your tests.</p>
+<p>However, it's important to remember that it's a heuristic, not an unyielding dogma. The exact ratios between unit, integration, and E2E tests can vary depending on the nature of your Django project. For instance, a heavily API-driven backend might have a larger proportion of integration tests compared to a very simple CRUD application.</p>
+<p>The fundamental principle is to be <em>intentional</em> about your testing strategy. Understand the strengths and weaknesses of each test type, and allocate your efforts to achieve a balance that provides the most confidence and the fastest feedback for your specific context. The ultimate goal is not to perfectly replicate a geometric shape, but to build a test suite that empowers you to develop and deploy your Django applications with confidence and peace of mind.</p>
+</div></div><script>
+document.addEventListener('DOMContentLoaded', function() {
+  const preTags = document.querySelectorAll('pre');
+  
+  preTags.forEach(function(pre) {
+    const existingContainer = pre.closest('.pre-container');
+    if (existingContainer) {
+      // If pre is already in a container (e.g. script ran multiple times or manual structure)
+      // Ensure button is there or add it. For simplicity, we assume if container exists, button might too.
+      // A more robust check would be to see if a .copy-btn already exists for this pre.
+      // For now, let's prevent adding duplicate buttons if script re-runs on dynamic content.
+      if (existingContainer.querySelector('.copy-btn')) {
+          return; // Skip if button already there
+      }
+    }
+
+    const container = document.createElement('div');
+    container.className = 'pre-container';
+    
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'Copy';
+    copyBtn.className = 'copy-btn';
+    
+    copyBtn.addEventListener('click', function() {
+      const textToCopy = pre.innerText || pre.textContent; // .innerText is often better for user-visible text
+      navigator.clipboard.writeText(textToCopy).then(
+        function() {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          copyBtn.classList.remove('failed');
+          
+          setTimeout(function() {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('copied');
+          }, 2000);
+        },
+        function() {
+          const originalText = copyBtn.textContent;
+          copyBtn.textContent = 'Failed!';
+          copyBtn.classList.add('failed');
+          copyBtn.classList.remove('copied');
+          
+          setTimeout(function() {
+            copyBtn.textContent = originalText;
+            copyBtn.classList.remove('failed');
+          }, 2000);
+        }
+      );
+    });
+    
+    // Structure: parent -> container -> pre & button
+    if (pre.parentNode) {
+        pre.parentNode.insertBefore(container, pre);
+    }
+    container.appendChild(pre); // Move pre into container
+    container.appendChild(copyBtn); // Add button to container
+  });
+});
+</script></body></html>
