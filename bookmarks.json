@@ -1,0 +1,12 @@
+[
+  {
+    "bookTitle": "Full Stack Django",
+    "chapterTitle": "Chapter 1: Django Models – The Basics",
+    "url": "./Full_Stack_Django/01_django-models-the-basics.html#162-ordering-limiting-and-aggregating-querysets"
+  },
+  {
+    "bookTitle": "Django Testing with Pytest",
+    "chapterTitle": "Chapter 1: The (Why) of Testing in Django",
+    "url": "./Django_Testing_with_Pytest/01_the-why-of-testing-in-django.html#14-thinking-like-a-tester-what-could-go-wrong"
+  }
+]

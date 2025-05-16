@@ -1,126 +1,141 @@
-<html><head><meta content="light dark" name="color-scheme"/><link href="./style/icons/default/16x16.png" rel="icon"/><link href="./style/themes/github-dark.css" id="_theme" rel="stylesheet" type="text/css"/><link href="./vendor/prism-okaidia.min.css" id="_prism" rel="stylesheet" type="text/css"/><link defer="" href="./style/style.css" rel="stylesheet"/><style>
-.pre-container {
-    position: relative;
-}
+<html>
+  <head>
+    <meta content="light dark" name="color-scheme" />
+    <link href="./style/icons/default/16x16.png" rel="icon" />
+    <link
+      href="./style/themes/github-dark.css"
+      id="_theme"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link
+      href="./vendor/prism-okaidia.min.css"
+      id="_prism"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <link defer="" href="./style/style.css" rel="stylesheet" />
+    <style>
+      .pre-container {
+        position: relative;
+      }
 
-.copy-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    padding: 3px 8px;
-    font-size: 12px;
-    background-color: #800000; /* Maroon */
-    color: white;
-    border: 1px solid #5c0000; /* Darker maroon */
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
+      .copy-btn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        padding: 3px 8px;
+        font-size: 12px;
+        background-color: #800000; /* Maroon */
+        color: white;
+        border: 1px solid #5c0000; /* Darker maroon */
+        border-radius: 3px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
 
-.copy-btn:hover {
-    background-color: #a00000; /* Lighter maroon on hover */
-}
+      .copy-btn:hover {
+        background-color: #a00000; /* Lighter maroon on hover */
+      }
 
-.copy-btn.copied {
-    background-color: #006400; /* Dark Green */
-    border-color: #004d00;
-    color: white;
-}
+      .copy-btn.copied {
+        background-color: #006400; /* Dark Green */
+        border-color: #004d00;
+        color: white;
+      }
 
-.copy-btn.failed {
-    background-color: #dc3545; /* Red */
-    border-color: #c82333;
-    color: white;
-}
-</style></head><body class="_theme-github _color-light"><div class="markdown-body" id="_html" style="visibility: visible;"><div class="akbar_container"><h1 id="my-django-reading-lists" tabindex="-1"><a class="anchor" href="#my-django-reading-lists" name="my-django-reading-lists" tabindex="-1"><span class="octicon octicon-link"></span></a>My Django Reading Lists</h1>
-<p>Welcome to my reading list of Django books and tutorials, mostly generated or assisted by LLMs. This static site is hosted on GitHub Pages directly from the root of the <code>main</code> branch.</p>
-<h2 id="available-books" tabindex="-1"><a class="anchor" href="#available-books" name="available-books" tabindex="-1"><span class="octicon octicon-link"></span></a>Available Books</h2>
-<ul>
-<li><a href="./Django_Testing_with_Pytest/00_front-matters.html">Django Testing with Pytest</a></li>
-<li><a href="./Full_Stack_Django/00_front-matters.html">Full Stack Django</a></li>
-</ul>
-<p><em>More books and tutorials will be added here over time.</em></p>
-<hr/>
-<h2 id="usage" tabindex="-1"><a class="anchor" href="#usage" name="usage" tabindex="-1"><span class="octicon octicon-link"></span></a>Usage</h2>
-<ol>
-<li>
-<p>Clone the repository:</p>
-<pre class="language-bash" tabindex="0"><code class="language-bash"><span class="token function">git</span> clone git@github.com:<span class="token operator">&lt;</span>your-username<span class="token operator">&gt;</span>/<span class="token operator">&lt;</span>your-repo<span class="token operator">&gt;</span>.git
+      .copy-btn.failed {
+        background-color: #dc3545; /* Red */
+        border-color: #c82333;
+        color: white;
+      }
+    </style>
+  </head>
+  <body class="_theme-github _color-light">
+    <div class="markdown-body" id="_html" style="visibility: visible">
+      <div class="akbar_container">
+        <h1 id="my-django-reading-lists" tabindex="-1">
+          <a
+            class="anchor"
+            href="#my-django-reading-lists"
+            name="my-django-reading-lists"
+            tabindex="-1"
+            ><span class="octicon octicon-link"></span></a
+          >My Django Reading Lists
+        </h1>
+        <p>
+          Welcome to my reading list of Django books and tutorials, mostly
+          generated or assisted by LLMs. This static site is hosted on GitHub
+          Pages directly from the root of the <code>main</code> branch.
+        </p>
+        <h2 id="available-books" tabindex="-1">
+          <a
+            class="anchor"
+            href="#available-books"
+            name="available-books"
+            tabindex="-1"
+            ><span class="octicon octicon-link"></span></a
+          >Available Books
+        </h2>
+        <ul>
+          <li>
+            <a href="./Django_Testing_with_Pytest/00_front-matters.html"
+              >Django Testing with Pytest</a
+            >
+          </li>
+          <li>
+            <a href="./Full_Stack_Django/00_front-matters.html"
+              >Full Stack Django</a
+            >
+          </li>
+        </ul>
+        <p><em>More books and tutorials will be added here over time.</em></p>
+        <hr />
+        <h2 id="usage" tabindex="-1">
+          <a class="anchor" href="#usage" name="usage" tabindex="-1"
+            ><span class="octicon octicon-link"></span></a
+          >Usage
+        </h2>
+        <ol>
+          <li>
+            <p>Clone the repository:</p>
+            <pre
+              class="language-bash"
+              tabindex="0"
+            ><code class="language-bash"><span class="token function">git</span> clone git@github.com:<span class="token operator">&lt;</span>your-username<span class="token operator">&gt;</span>/<span class="token operator">&lt;</span>your-repo<span class="token operator">&gt;</span>.git
 <span class="token builtin class-name">cd</span> <span class="token operator">&lt;</span>your-repo<span class="token operator">&gt;</span>
 </code></pre>
-</li>
-<li>
-<p>Open the site locally by opening <code>index.html</code> or any of the links above in your browser.</p>
-</li>
-<li>
-<p>To add new books, create a new directory or add HTML files, then update this README with links.</p>
-</li>
-</ol>
-<hr/>
-<h2 id="bookmarks" tabindex="-1"><a class="anchor" href="#bookmarks" name="bookmarks" tabindex="-1"><span class="octicon octicon-link"></span></a>Bookmarks</h2>
-<p>Keep track of where you left off:</p>
-<ul>
-<li>📌 Full Stack Django – <a href="./Full_Stack_Django/01_django-models-the-basics.html#153-verbose-names-and-help-text">Chapter 1: Django Models – The Basics</a></li>
-<li>📌 Django Testing with Pytest – <a href="./Django_Testing_with_Pytest/01_the-why-of-testing-in-django.html">Chapter 1: The "Why" of Testing in Django</a></li>
-</ul>
-<p><em>Update these links as needed to resume reading where you last stopped.</em></p>
-</div></div><script>
-document.addEventListener('DOMContentLoaded', function() {
-  const preTags = document.querySelectorAll('pre');
-  
-  preTags.forEach(function(pre) {
-    const existingContainer = pre.closest('.pre-container');
-    if (existingContainer) {
-      // If pre is already in a container (e.g. script ran multiple times or manual structure)
-      // Ensure button is there or add it. For simplicity, we assume if container exists, button might too.
-      // A more robust check would be to see if a .copy-btn already exists for this pre.
-      // For now, let's prevent adding duplicate buttons if script re-runs on dynamic content.
-      if (existingContainer.querySelector('.copy-btn')) {
-          return; // Skip if button already there
-      }
-    }
+          </li>
+          <li>
+            <p>
+              Open the site locally by opening <code>index.html</code> or any of
+              the links above in your browser.
+            </p>
+          </li>
+          <li>
+            <p>
+              To add new books, create a new directory or add HTML files, then
+              update this README with links.
+            </p>
+          </li>
+        </ol>
+        <hr />
 
-    const container = document.createElement('div');
-    container.className = 'pre-container';
-    
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = 'Copy';
-    copyBtn.className = 'copy-btn';
-    
-    copyBtn.addEventListener('click', function() {
-      const textToCopy = pre.innerText || pre.textContent; // .innerText is often better for user-visible text
-      navigator.clipboard.writeText(textToCopy).then(
-        function() {
-          const originalText = copyBtn.textContent;
-          copyBtn.textContent = 'Copied!';
-          copyBtn.classList.add('copied');
-          copyBtn.classList.remove('failed');
-          
-          setTimeout(function() {
-            copyBtn.textContent = originalText;
-            copyBtn.classList.remove('copied');
-          }, 2000);
-        },
-        function() {
-          const originalText = copyBtn.textContent;
-          copyBtn.textContent = 'Failed!';
-          copyBtn.classList.add('failed');
-          copyBtn.classList.remove('copied');
-          
-          setTimeout(function() {
-            copyBtn.textContent = originalText;
-            copyBtn.classList.remove('failed');
-          }, 2000);
-        }
-      );
-    });
-    
-    // Structure: parent -> container -> pre & button
-    if (pre.parentNode) {
-        pre.parentNode.insertBefore(container, pre);
-    }
-    container.appendChild(pre); // Move pre into container
-    container.appendChild(copyBtn); // Add button to container
-  });
-});
-</script></body></html>
+        <div class="bookmark-container">
+          <h2 id="bookmarks" tabindex="-1">
+            <a class="anchor" href="#bookmarks" name="bookmarks" tabindex="-1"
+              ><span class="octicon octicon-link"></span></a
+            >Bookmarks
+          </h2>
+          <p>Keep track of where you left off:</p>
+          <ul id="bookmarks-list">
+            <!-- Bookmarks will be dynamically inserted here by app.js -->
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script defer src="./app.js"></script>
+    <!-- If you want to load it from an external file -->
+  </body>
+</html>
