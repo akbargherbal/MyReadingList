@@ -1,2 +1,2 @@
-# ignore markdown_converter.py
-**/markdown_converter.py
+# ignore any folder starts with New folder
+**/New folder*/  
