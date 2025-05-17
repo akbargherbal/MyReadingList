@@ -2,11 +2,11 @@
   {
     "bookTitle": "Full Stack Django",
     "chapterTitle": "Chapter 1: Django Models – The Basics",
-    "url": "./Full_Stack_Django/01_django-models-the-basics.html#163-basic-query-optimization-tips"
+    "url": "./Full_Stack_Django/01_django-models-the-basics.html#17-data-migrations-and-schema-changes"
   },
   {
     "bookTitle": "Django Testing with Pytest",
     "chapterTitle": "Chapter 1: The (Why) of Testing in Django",
-    "url": "./Django_Testing_with_Pytest/01_the-why-of-testing-in-django.html#17-data-migrations-and-schema-changes"
+    "url": "./Django_Testing_with_Pytest/02_your-first-django-test-hello-pytest.html"
   }
 ]
