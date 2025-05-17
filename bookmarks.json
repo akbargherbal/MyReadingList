@@ -2,7 +2,7 @@
   {
     "bookTitle": "Full Stack Django",
     "chapterTitle": "Chapter 1: Django Models – The Basics",
-    "url": "./Full_Stack_Django/01_django-models-the-basics.html#162-ordering-limiting-and-aggregating-querysets"
+    "url": "./Full_Stack_Django/01_django-models-the-basics.html#163-basic-query-optimization-tips"
   },
   {
     "bookTitle": "Django Testing with Pytest",
