@@ -2,7 +2,7 @@
   {
     "bookTitle": "Full Stack Django",
     "chapterTitle": "Chapter 1: Django Models – The Basics",
-    "url": "./Full_Stack_Django/01_django-models-the-basics.html#173-best-practices-for-evolving-your-data-schema"
+    "url": "./Full_Stack_Django/01_django-models-the-basics.html#18-basic-model-methods-and-string-representations"
   },
   {
     "bookTitle": "Django Testing with Pytest",
