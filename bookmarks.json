@@ -2,7 +2,7 @@
   {
     "bookTitle": "Full Stack Django",
     "chapterTitle": "Chapter 1: Django Models – The Basics",
-    "url": "./Full_Stack_Django/01_django-models-the-basics.html#192-debugging-common-issues"
+    "url": "./Full_Stack_Django/02_advanced-patterns-in-django-models.html#22-custom-managers-and-querysets"
   },
   {
     "bookTitle": "Django Testing with Pytest",
