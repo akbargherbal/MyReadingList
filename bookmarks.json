@@ -1,7 +1,7 @@
 [
   {
     "bookTitle": "Full Stack Django",
-    "chapterTitle": "Chapter 1: Django Models – The Basics",
+    "chapterTitle": "Chapter 2: Advanced Patterns in Django Models",
     "url": "./Full_Stack_Django/02_advanced-patterns-in-django-models.html#22-custom-managers-and-querysets"
   },
   {
